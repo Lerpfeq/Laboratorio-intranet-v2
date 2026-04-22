@@ -1,0 +1,23 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/agendamento/page": "app/agendamento/page.js",
+  "/amostras/page": "app/amostras/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/login/page": "app/login/page.js",
+  "/removedor-bg/page": "app/removedor-bg/page.js",
+  "/page": "app/page.js",
+  "/reagentes/page": "app/reagentes/page.js",
+  "/residuos/page": "app/residuos/page.js",
+  "/signup/page": "app/signup/page.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/admin/users/route": "app/api/admin/users/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/agendamento/route": "app/api/agendamento/route.js",
+  "/api/pedidos/route": "app/api/pedidos/route.js",
+  "/api/reagentes/saida/route": "app/api/reagentes/saida/route.js",
+  "/api/reagentes/consulta/route": "app/api/reagentes/consulta/route.js",
+  "/api/signup/route": "app/api/signup/route.js",
+  "/api/users/[id]/route": "app/api/users/[id]/route.js",
+  "/api/reagentes/route": "app/api/reagentes/route.js"
+}

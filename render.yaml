@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: lerp-intranet
+    env: node
+   buildCommand: "cd nextjs_space && yarn install --production=false && yarn prisma generate && yarn build"
+    startCommand: "cd nextjs_space && yarn start"
+    regions:
+      - sa-east-1
+    envVars:
+      - key: DATABASE_URL
+        scope: build
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        scope: build
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        scope: build
+        sync: false
+      - key: NODE_ENV
+        value: production
+  
+  - type: pserv
+    name: lerp-database
+    plan: free
+    ipAllowList: []
+    postgreSQL:
+      name: lerp_intranet
+      user: postgreslerp

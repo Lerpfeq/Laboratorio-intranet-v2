@@ -1,0 +1,215 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+    provider = "postgresql"
+    url = env("DATABASE_URL")
+}
+
+model Account {
+  id                 String    @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?   @db.Text
+  access_token       String?   @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?   @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  status        String    @default("pending")
+  category      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  reagentes     ReagenteEntrada[]
+  saidas        ReagenteSaida[]
+  pedidos       Pedido[]
+  agendamentos  Agendamento[]
+  autorizacoes  AutorizacaoEquipamento[]
+  residuos      RegistroResiduo[]
+
+  @@index([status])
+  @@index([category])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Equipamento {
+  id           String   @id @default(cuid())
+  nome         String
+  descricao    String?
+  status       String   @default("disponivel")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  autorizacoes AutorizacaoEquipamento[]
+  agendamentos Agendamento[]
+
+  @@index([status])
+}
+
+model AutorizacaoEquipamento {
+  id            String   @id @default(cuid())
+  usuarioId     String
+  equipamentoId String
+  autorizado    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  usuario     User        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, equipamentoId])
+  @@index([equipamentoId])
+}
+
+model Reagente {
+  id           String   @id @default(cuid())
+  nome         String
+  marca        String?
+  volume       String?
+  localidade   String?
+  status       String   @default("ok")
+  ultimaAtualizacao DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entradas ReagenteEntrada[]
+  saidas   ReagenteSaida[]
+  pedidos  Pedido[]
+
+  @@index([nome])
+  @@index([marca])
+  @@index([status])
+}
+
+model ReagenteEntrada {
+  id              String   @id @default(cuid())
+  reagenteId      String
+  usuarioId       String
+  dataEntrada     DateTime
+  fornecedor      String
+  notaFiscal      String?
+  volume          String?
+  marca           String?
+  quantidade      Int
+  codigoInterno   String   @unique
+  codigoQR        String?  @db.Text
+  localizacao     String?
+  observacoes     String?  @db.Text
+  categoria       String?
+  concentracao    String?
+  dataValidade    DateTime?
+  perigos         String?  @db.Text
+  responsavel     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  reagente Reagente @relation(fields: [reagenteId], references: [id], onDelete: Cascade)
+  usuario  User     @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([reagenteId])
+  @@index([codigoInterno])
+  @@index([dataEntrada])
+}
+
+model ReagenteSaida {
+  id           String   @id @default(cuid())
+  reagenteId   String
+  usuarioId    String
+  dataSaida    DateTime
+  quantidade   Int
+  observacoes  String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  reagente Reagente @relation(fields: [reagenteId], references: [id], onDelete: Cascade)
+  usuario  User     @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([reagenteId])
+  @@index([dataSaida])
+}
+
+model Pedido {
+  id           String   @id @default(cuid())
+  reagenteId   String
+  usuarioId    String
+  dataPedido   DateTime @default(now())
+  quantidade   Int
+  status       String   @default("pendente")
+  observacoes  String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reagente Reagente @relation(fields: [reagenteId], references: [id], onDelete: Cascade)
+  usuario  User     @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([reagenteId])
+  @@index([status])
+  @@index([dataPedido])
+}
+
+model Agendamento {
+  id            String   @id @default(cuid())
+  equipamentoId String
+  usuarioId     String
+  dataInicio    DateTime
+  dataFim       DateTime
+  observacoes   String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  equipamento Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
+  usuario     User        @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([equipamentoId])
+  @@index([dataInicio])
+  @@index([usuarioId])
+}
+
+model RegistroResiduo {
+  id           String   @id @default(cuid())
+  usuarioId    String
+  tipo         String
+  peso         Float
+  data         DateTime
+  observacoes  String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  usuario User @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([data])
+}
