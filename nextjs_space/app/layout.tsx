@@ -5,7 +5,8 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'LERP - Intranet',
   description: 'Sistema de Gestao - Laboratorio de Engenharia de Reacoes Poliméricas',
-};
+  icons: icon: '/logo.png',
+ };
 
 export default function RootLayout({
   children,
