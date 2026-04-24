@@ -31,7 +31,7 @@ export default function LoginPage() {
         router.replace('/dashboard');
       }
     } catch (err: any) {
-      setError(err?.message || 'Erro ao fazer login');
+      setError(err?.message || 'Error logging in');
     } finally {
       setLoading(false);
     }
@@ -62,14 +62,14 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu@email.com"
+              placeholder="your@email.com"
               disabled={loading}
               style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.95rem' }}
             />
           </div>
 
           <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Senha</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Password</label>
             <input
               type="password"
               value={password}
@@ -85,7 +85,7 @@ export default function LoginPage() {
             disabled={loading}
             style={{ width: '100%', padding: '0.75rem', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}
           >
-            {loading ? 'Conectando...' : 'Entrar'}
+            {loading ? 'Connecting...' : 'Log in'}
           </button>
         </form>
 
@@ -99,11 +99,11 @@ export default function LoginPage() {
           disabled={loading}
           style={{ width: '100%', padding: '0.75rem', background: '#fff', border: '1px solid #ddd', borderRadius: '4px', fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
         >
-          <span>Entrar com Google</span>
+          <span>Sign in with Google</span>
         </button>
 
         <p style={{ textAlign: 'center', marginTop: '2rem', color: '#666', fontSize: '0.9rem' }}>
-          Não tem conta? <Link href="/signup" style={{ color: '#3498db', textDecoration: 'none', fontWeight: 500 }}>Criar conta</Link>
+          Don't have an account? <Link href="/signup" style={{ color: '#3498db', textDecoration: 'none', fontWeight: 500 }}>Create an account</Link>
         </p>
       </div>
     </div>
