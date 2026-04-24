@@ -73,12 +73,12 @@ export default function DashboardPage() {
           <nav className="nav-tabs">
             {user.status === 'approved' && (
               <>
-                <Link href="/dashboard">Inicio</Link>
-                <Link href="/reagentes">Reagentes</Link>
-                {(isPosGraduando || isAdmin) && <Link href="/agendamento">Agendamento</Link>}
-                {(isPosGraduando || isAdmin) && <Link href="/residuos">Residuos</Link>}
-                <Link href="/amostras">Amostras</Link>
-                <Link href="/removedor-bg">Remover BG</Link>
+                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/reagentes">Reagent</Link>
+                {(isPosGraduando || isAdmin) && <Link href="/agendamento">Calendar</Link>}
+                {(isPosGraduando || isAdmin) && <Link href="/residuos">Waste</Link>}
+                <Link href="/amostras">Samples Seletion</Link>
+                <Link href="/removedor-bg">Image</Link>
                 {isAdmin && <Link href="/admin">Admin</Link>}
               </>
             )}
