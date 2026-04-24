@@ -191,7 +191,7 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
                 color: '#7f8c8d',
               }}
             >
-              LERP - Polymer Reaction Engineering Laboratory
+              LERP - Laboratório de Engenharia de Reações Poliméricas
             </p>
           </div>
         </div>
