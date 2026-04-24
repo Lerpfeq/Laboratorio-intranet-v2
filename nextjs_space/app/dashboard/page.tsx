@@ -47,11 +47,11 @@ export default function DashboardPage() {
   };
 
   if (status === 'loading' || loading) {
-    return <div style={{ textAlign: 'center', padding: '2rem' }}>Carregando...</div>;
+    return <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>;
   }
 
   if (!user) {
-    return <div style={{ textAlign: 'center', padding: '2rem' }}>Erro ao carregar dados do usuario</div>;
+    return <div style={{ textAlign: 'center', padding: '2rem' }}>Error loading user data</div>;
   }
 
   const isAdmin = user.category === 'Admin';
@@ -100,18 +100,18 @@ export default function DashboardPage() {
           <div className="alert alert-info">
             <span>!</span>
             <div>
-              <strong>Aguardando aprovacao</strong><br />
-              Sua conta esta pendente de aprovacao por um administrador. Voce sera notificado em breve.
+              <strong>Pending approval</strong><br />
+               Your account is pending approval by an administrator. You will be notified shortly.
             </div>
           </div>
         )}
 
-        <h2 className="page-title">Bem-vindo, {user.name || user.email}!</h2>
+        <h2 className="page-title">Welcome, {user.name || user.email}!</h2>
 
         {user.status === 'approved' ? (
           <>
             <p style={{ marginBottom: '2rem', fontSize: '1.05rem', color: '#666' }}>
-              Selecione uma opcao abaixo para comecar:
+              Select an option below to get started:
             </p>
 
             <div className="card-grid">
@@ -119,10 +119,9 @@ export default function DashboardPage() {
                 <Link href="/reagentes" style={{ textDecoration: 'none' }}>
                   <div className="card card-blue">
                     <div className="card-header">
-                      <span>Chemistry</span>
-                      <span>Reagentes</span>
+                      <span>Reagent inventory</span>
                     </div>
-                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Gerenciar entrada, saida e estoque de reagentes</p>
+                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Manage reagent inventory</p>
                   </div>
                 </Link>
               )}
@@ -132,9 +131,8 @@ export default function DashboardPage() {
                   <div className="card card-blue">
                     <div className="card-header">
                       <span>Search</span>
-                      <span>Consultar Estoque</span>
                     </div>
-                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Consultar disponibilidade de reagentes</p>
+                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Check reagent availability</p>
                   </div>
                 </Link>
               )}
@@ -144,9 +142,8 @@ export default function DashboardPage() {
                   <div className="card card-orange">
                     <div className="card-header">
                       <span>Calendar</span>
-                      <span>Agendamento</span>
                     </div>
-                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Agendar equipamentos do laboratorio</p>
+                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Schedule lab equipment</p>
                   </div>
                 </Link>
               )}
@@ -155,10 +152,9 @@ export default function DashboardPage() {
                 <Link href="/residuos" style={{ textDecoration: 'none' }}>
                   <div className="card card-red">
                     <div className="card-header">
-                      <span>Trash</span>
-                      <span>Residuos</span>
+                      <span>Waste</span>
                     </div>
-                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Registrar e gerenciar residuos</p>
+                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Record and manage waste</p>
                   </div>
                 </Link>
               )}
@@ -166,10 +162,9 @@ export default function DashboardPage() {
               <Link href="/amostras" style={{ textDecoration: 'none' }}>
                 <div className="card card-green">
                   <div className="card-header">
-                    <span>Samples</span>
-                    <span>Selecao de Amostras</span>
+                    <span>Samples Selection</span>
                   </div>
-                  <p style={{ color: '#666', fontSize: '0.9rem' }}>Selecionar melhor combinacao de amostras</p>
+                  <p style={{ color: '#666', fontSize: '0.9rem' }}>Select the best combination of samples</p>
                 </div>
               </Link>
 
@@ -177,9 +172,8 @@ export default function DashboardPage() {
                 <div className="card card-purple">
                   <div className="card-header">
                     <span>Image</span>
-                    <span>Remover Background</span>
                   </div>
-                  <p style={{ color: '#666', fontSize: '0.9rem' }}>Remover fundo de imagens</p>
+                  <p style={{ color: '#666', fontSize: '0.9rem' }}>Remove the background from images</p>
                 </div>
               </Link>
 
@@ -188,9 +182,8 @@ export default function DashboardPage() {
                   <div className="card card-teal">
                     <div className="card-header">
                       <span>Settings</span>
-                      <span>Painel Admin</span>
                     </div>
-                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Gerenciar usuarios e permissoes</p>
+                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Manage users and permissions</p>
                   </div>
                 </Link>
               )}
@@ -199,7 +192,7 @@ export default function DashboardPage() {
         ) : (
           <div style={{ marginTop: '2rem', padding: '2rem', background: '#f0f0f0', borderRadius: '8px', textAlign: 'center' }}>
             <p style={{ fontSize: '1.1rem', color: '#666' }}>
-              Sua conta esta aguardando aprovacao. Entre em contato com um administrador para ter acesso as funcionalidades.
+              Your account is pending approval. Please contact an administrator to gain access to the features.
             </p>
           </div>
         )}
