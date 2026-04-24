@@ -1,13 +1,13 @@
 'use client';
-
+ 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import EtiquetaReagente from '@/components/EtiquetaReagente';
-
-interface Reagente {
+ 
+interface Reagent {
   id: string;
   nome: string;
   marca: string | null;
@@ -20,27 +20,27 @@ interface Reagente {
     localizacao: string | null;
   }[];
 }
-
+ 
 export default function ReagentesPage() {
   const { data: session, status } = useSession() || {};
   const router = useRouter();
-  const [reagentes, setReagentes] = useState<Reagente[]>([]);
+  const [reagentes, setReagentes] = useState<Reagent[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('consulta');
   const [user, setUser] = useState<any>(null);
-
+ 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.replace('/login');
     }
   }, [status, router]);
-
+ 
   useEffect(() => {
     if (session?.user?.id) {
       fetchUserAndReagentes();
     }
   }, [session]);
-
+ 
   const fetchUserAndReagentes = async () => {
     try {
       const userRes = await fetch('/api/auth/me');
@@ -48,7 +48,7 @@ export default function ReagentesPage() {
         const userData = await userRes.json();
         setUser(userData);
       }
-
+ 
       const reagentesRes = await fetch('/api/reagentes');
       if (reagentesRes.ok) {
         const data = await reagentesRes.json();
@@ -60,14 +60,14 @@ export default function ReagentesPage() {
       setLoading(false);
     }
   };
-
+ 
   if (status === 'loading' || loading) {
-    return <div style={{ padding: '2rem' }}>Carregando...</div>;
+    return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
-
+ 
   const isAdmin = user?.category === 'Admin';
   const isPosGraduando = user?.category === 'Pos-graduando';
-
+ 
   return (
     <div>
       <header className="header">
@@ -80,41 +80,41 @@ export default function ReagentesPage() {
           </div>
           <nav className="nav-tabs">
             <Link href="/dashboard">Dashboard</Link>
-            <Link href="/reagentes">Reagentes</Link>
+            <Link href="/reagentes">Reagents</Link>
           </nav>
           <div className="user-menu">
             <span>{user?.name}</span>
-            <button onClick={() => router.push('/api/auth/signout')}>Sair</button>
+            <button onClick={() => router.push('/api/auth/signout')}>Log out</button>
           </div>
         </div>
       </header>
-
+ 
       <main className="container">
-        <h2 className="page-title">Gestão de Reagentes</h2>
-
+        <h2 className="page-title">Reagent Management</h2>
+ 
         {(isPosGraduando || isAdmin) && (
           <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', borderBottom: '2px solid #e0e0e0' }}>
             <button
               onClick={() => setTab('consulta')}
               style={{ padding: '0.75rem 1rem', background: tab === 'consulta' ? '#3498db' : 'transparent', color: tab === 'consulta' ? 'white' : '#333', border: 'none', cursor: 'pointer', borderRadius: '4px 4px 0 0' }}
             >
-              Consulta de Estoque
+              Check Inventory
             </button>
             <button
               onClick={() => setTab('entrada')}
               style={{ padding: '0.75rem 1rem', background: tab === 'entrada' ? '#3498db' : 'transparent', color: tab === 'entrada' ? 'white' : '#333', border: 'none', cursor: 'pointer', borderRadius: '4px 4px 0 0' }}
             >
-              Entrada de Reagente
+              Reagent Input
             </button>
             <button
               onClick={() => setTab('saida')}
               style={{ padding: '0.75rem 1rem', background: tab === 'saida' ? '#3498db' : 'transparent', color: tab === 'saida' ? 'white' : '#333', border: 'none', cursor: 'pointer', borderRadius: '4px 4px 0 0' }}
             >
-              Saída de Reagente
+              Reagent Output
             </button>
           </div>
         )}
-
+ 
         {tab === 'consulta' && <ConsultaReagentes />}
         {tab === 'entrada' && (isPosGraduando || isAdmin) && <EntradaForm onSuccess={fetchUserAndReagentes} />}
         {tab === 'saida' && (isPosGraduando || isAdmin) && <SaidaForm reagentes={reagentes} onSuccess={fetchUserAndReagentes} />}
@@ -122,45 +122,45 @@ export default function ReagentesPage() {
     </div>
   );
 }
-
+ 
 function ConsultaReagentes() {
   const [reagentes, setReagentes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [filtros, setFiltros] = useState({ nome: '', marca: '' });
-
+ 
   useEffect(() => {
     fetchReagentes();
   }, []);
-
+ 
   const fetchReagentes = async (nome = '', marca = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (nome) params.append('nome', nome);
       if (marca) params.append('marca', marca);
-
+ 
       const res = await fetch(`/api/reagentes/consulta?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setReagentes(data);
       }
     } catch (error) {
-      console.error('Erro ao buscar:', error);
+      console.error('Search error:', error);
     } finally {
       setLoading(false);
     }
   };
-
+ 
   const handleFilterChange = (field: string, value: string) => {
     const novosFiltros = { ...filtros, [field]: value };
     setFiltros(novosFiltros);
     fetchReagentes(novosFiltros.nome, novosFiltros.marca);
   };
-
+ 
   return (
     <div>
-      <h3 style={{ marginBottom: '1.5rem' }}>🔍 Consulta de Estoque</h3>
-
+      <h3 style={{ marginBottom: '1.5rem' }}>🔍 Check Inventory</h3>
+ 
       <div
         style={{
           display: 'grid',
@@ -173,40 +173,40 @@ function ConsultaReagentes() {
         }}
       >
         <div className="form-group" style={{ margin: 0 }}>
-          <label>Filtrar por Nome</label>
+          <label>Filter by Name</label>
           <input
             type="text"
             value={filtros.nome}
             onChange={(e) => handleFilterChange('nome', e.target.value)}
-            placeholder="Digite o nome do reagente"
+            placeholder="Enter the reagent's name"
           />
         </div>
         <div className="form-group" style={{ margin: 0 }}>
-          <label>Filtrar por Marca</label>
+          <label>Filter by Brand</label>
           <input
             type="text"
             value={filtros.marca}
             onChange={(e) => handleFilterChange('marca', e.target.value)}
-            placeholder="Digite a marca"
+            placeholder="Enter the brand"
           />
         </div>
       </div>
-
+ 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '2rem' }}>Carregando...</div>
+        <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>
       ) : reagentes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '2rem', color: '#7f8c8d' }}>Nenhum reagente encontrado</div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#7f8c8d' }}>No results found</div>
       ) : (
         <table className="table">
           <thead>
             <tr>
-              <th>Nome</th>
-              <th>Marca</th>
-              <th>Código Interno</th>
-              <th>Categoria</th>
-              <th>Concentração</th>
-              <th>Localização</th>
-              <th>Validade</th>
+              <th>Name</th>
+              <th>Brand</th>
+              <th>Internal Code</th>
+              <th>Category</th>
+              <th>Concentration</th>
+              <th>Location</th>
+              <th>Expiry Date</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -223,7 +223,7 @@ function ConsultaReagentes() {
                   <td>{ultimaEntrada?.localizacao || '-'}</td>
                   <td>
                     {ultimaEntrada?.dataValidade
-                      ? new Date(ultimaEntrada.dataValidade).toLocaleDateString('pt-BR')
+                      ? new Date(ultimaEntrada.dataValidade).toLocaleDateString('en-US')
                       : '-'}
                   </td>
                   <td><span className={`status-badge status-${r.status}`}>{r.status}</span></td>
@@ -236,7 +236,7 @@ function ConsultaReagentes() {
     </div>
   );
 }
-
+ 
 function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -256,24 +256,24 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
     perigos: '',
     responsavel: '',
   });
-
+ 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
     setEtiqueta(null);
-
+ 
     try {
       const res = await fetch('/api/reagentes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
-
+ 
       if (res.ok) {
         const data = await res.json();
         setEtiqueta(data);
-        setMessage('Reagente adicionado com sucesso!');
+        setMessage('Reagent successfully added!');
         setTimeout(() => {
           setFormData({
             nome: '',
@@ -293,19 +293,19 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
         }, 3000);
         onSuccess();
       } else {
-        setMessage('Erro ao adicionar reagente');
+        setMessage('Error adding reagent.');
       }
     } catch (error) {
-      setMessage('Erro ao adicionar reagente');
+      setMessage('Error adding reagent.');
     } finally {
       setLoading(false);
     }
   };
-
+ 
   if (etiqueta) {
     return (
       <div>
-        <h3 style={{ marginBottom: '1rem', color: '#27ae60' }}>✅ Etiqueta Gerada</h3>
+        <h3 style={{ marginBottom: '1rem', color: '#27ae60' }}>✅ Generated Label</h3>
         <EtiquetaReagente entrada={etiqueta} logoUrl="/logo.png" />
         <button
           onClick={() => setEtiqueta(null)}
@@ -319,16 +319,16 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
             cursor: 'pointer',
           }}
         >
-          Registrar Outro Reagente
+          Register Another Reagent
         </button>
       </div>
     );
   }
-
+ 
   return (
     <form onSubmit={handleSubmit} style={{ maxWidth: '700px', margin: '0 auto' }}>
       <div className="form-group">
-        <label>Nome do Reagente *</label>
+        <label>Reagent Name *</label>
         <input
           type="text"
           value={formData.nome}
@@ -336,10 +336,10 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           required
         />
       </div>
-
+ 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
-          <label>Marca</label>
+          <label>Brand</label>
           <input
             type="text"
             value={formData.marca}
@@ -347,7 +347,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
         <div className="form-group">
-          <label>Categoria (ex: Orgânico)</label>
+          <label>Category (e.g. Organic)</label>
           <input
             type="text"
             value={formData.categoria}
@@ -355,7 +355,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
-
+ 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
           <label>Volume</label>
@@ -363,11 +363,11 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
             type="text"
             value={formData.volume}
             onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
-            placeholder="Ex: 1L, 500ml"
+            placeholder="e.g. 1L, 500ml"
           />
         </div>
         <div className="form-group">
-          <label>Concentração (ex: 99,5%)</label>
+          <label>Concentration (e.g. 99.5%)</label>
           <input
             type="text"
             value={formData.concentracao}
@@ -375,10 +375,10 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
-
+ 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
-          <label>Localização (ex: ARM-03 | PRAT-02)</label>
+          <label>Location (e.g. CAB-03 | SHF-02)</label>
           <input
             type="text"
             value={formData.localidade}
@@ -386,7 +386,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
         <div className="form-group">
-          <label>Data de Validade</label>
+          <label>Expiry Date</label>
           <input
             type="date"
             value={formData.dataValidade}
@@ -394,10 +394,10 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
-
+ 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
-          <label>Fornecedor *</label>
+          <label>Supplier *</label>
           <input
             type="text"
             value={formData.fornecedor}
@@ -406,7 +406,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
         <div className="form-group">
-          <label>Nota Fiscal</label>
+          <label>Invoice Number</label>
           <input
             type="text"
             value={formData.notaFiscal}
@@ -414,20 +414,20 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
-
+ 
       <div className="form-group">
-        <label>Avisos/Perigos (ex: ⚠️ Inflamável)</label>
+        <label>Hazard Warnings (e.g. ⚠️ Flammable)</label>
         <input
           type="text"
           value={formData.perigos}
           onChange={(e) => setFormData({ ...formData, perigos: e.target.value })}
-          placeholder="Ex: Inflamável, Tóxico"
+          placeholder="e.g. Flammable, Toxic"
         />
       </div>
-
+ 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
-          <label>Quantidade *</label>
+          <label>Quantity *</label>
           <input
             type="number"
             value={formData.quantidade}
@@ -437,7 +437,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
         <div className="form-group">
-          <label>Responsável</label>
+          <label>Responsible</label>
           <input
             type="text"
             value={formData.responsavel}
@@ -445,87 +445,91 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
-
+ 
       <div className="form-group">
-        <label>Data de Entrada</label>
+        <label>Entry Date</label>
         <input
           type="date"
           value={formData.dataEntrada}
           onChange={(e) => setFormData({ ...formData, dataEntrada: e.target.value })}
         />
       </div>
-
+ 
       <button type="submit" disabled={loading} className="button button-primary">
-        {loading ? 'Processando...' : '🏷️ Gerar Etiqueta e Registrar'}
+        {loading ? 'Processing...' : '🏷️ Generate Label & Register'}
       </button>
-
-      {message && <div className={message.includes('sucesso') ? 'success-message' : 'error-message'}>{message}</div>}
+ 
+      {message && (
+        <div className={message.includes('successfully') ? 'success-message' : 'error-message'}>
+          {message}
+        </div>
+      )}
     </form>
   );
 }
-
-function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagente[]; onSuccess: () => void }) {
+ 
+function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagent[]; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [codigoInterno, setCodigoInterno] = useState('');
-
+ 
   const reagentesComCodigo = reagentes.filter((r) => r.entradas?.[0]?.codigoInterno);
-
+ 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+ 
     const reagenteSelecionado = reagentesComCodigo.find(
       (r) => r.entradas[0]?.codigoInterno === codigoInterno
     );
-
+ 
     if (!reagenteSelecionado) {
-      setMessage('Selecione um reagente válido pelo código interno.');
+      setMessage('Please select a valid reagent by internal code.');
       return;
     }
-
+ 
     const confirmarExclusao = window.confirm(
-      `Tem certeza que deseja excluir definitivamente o reagente "${reagenteSelecionado.nome}" (código ${codigoInterno})? Esta ação não pode ser desfeita.`
+      `Are you sure you want to permanently remove the reagent "${reagenteSelecionado.nome}" (code ${codigoInterno})? This action cannot be undone.`
     );
-
+ 
     if (!confirmarExclusao) {
       return;
     }
-
+ 
     setLoading(true);
     setMessage('');
-
+ 
     try {
       const res = await fetch('/api/reagentes/saida', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ codigoInterno }),
       });
-
+ 
       if (res.ok) {
-        setMessage('Saída concluída: reagente excluído definitivamente com sucesso!');
+        setMessage('Output recorded: reagent permanently removed.');
         setCodigoInterno('');
         onSuccess();
       } else {
         const data = await res.json().catch(() => ({}));
-        setMessage(data.error || 'Erro ao registrar saída');
+        setMessage(data.error || 'Error recording output.');
       }
     } catch (error) {
-      setMessage('Erro ao registrar saída');
+      setMessage('Error recording output.');
     } finally {
       setLoading(false);
     }
   };
-
+ 
   return (
     <form onSubmit={handleSubmit} style={{ maxWidth: '600px', margin: '0 auto' }}>
       <div className="form-group">
-        <label>Código interno do reagente *</label>
+        <label>Reagent Internal Code *</label>
         <select
           value={codigoInterno}
           onChange={(e) => setCodigoInterno(e.target.value)}
           required
         >
-          <option value="">Selecione o código interno</option>
+          <option value="">Select internal code</option>
           {reagentesComCodigo.map((r) => {
             const ultimaEntrada = r.entradas[0];
             return (
@@ -536,12 +540,16 @@ function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagente[]; onSuccess:
           })}
         </select>
       </div>
-
+ 
       <button type="submit" disabled={loading} className="button button-primary">
-        {loading ? 'Excluindo...' : 'Confirmar saída e excluir reagente'}
+        {loading ? 'Removing...' : 'Confirm Output & Remove Reagent'}
       </button>
-
-      {message && <div className={message.includes('sucesso') ? 'success-message' : 'error-message'}>{message}</div>}
+ 
+      {message && (
+        <div className={message.includes('recorded') ? 'success-message' : 'error-message'}>
+          {message}
+        </div>
+      )}
     </form>
   );
 }
