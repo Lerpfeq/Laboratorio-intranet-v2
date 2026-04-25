@@ -9,6 +9,59 @@ interface EtiquetaProps {
   logoUrl?: string;
 }
 
+const buttonStyles = `
+  .label-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .label-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.12);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .label-btn:hover::after { opacity: 1; }
+  .label-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.18); }
+  .label-btn:active { transform: translateY(0); box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+  .label-btn-print {
+    background: linear-gradient(135deg, #1a6fa8 0%, #2196d3 100%);
+    color: white;
+    box-shadow: 0 3px 10px rgba(26,111,168,0.35);
+  }
+  .label-btn-download {
+    background: linear-gradient(135deg, #1a7a4a 0%, #27ae60 100%);
+    color: white;
+    box-shadow: 0 3px 10px rgba(26,122,74,0.35);
+  }
+  .btn-icon {
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  /* Cut guide wrapper */
+  .cut-guide-wrapper {
+    position: relative;
+    display: inline-block;
+    padding: 12px;
+    border: 1.5px dashed #aab0b8;
+    border-radius: 2px;
+  }
+`;
+
 export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -25,16 +78,16 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
     const element = printRef.current;
     if (!element) return;
 
-    const printWindow = window.open('', '', 'height=600,width=800');
+    const printWindow = window.open('', '', 'height=600,width=900');
     if (!printWindow) return;
 
     printWindow.document.write(
       `<html><head><title>Label - ${entrada.reagente?.nome}</title>` +
       `<style>` +
-      `@page { size: 10cm 8cm; margin: 0; } ` +
+      `@page { size: 15cm auto; margin: 0; } ` +
       `body { font-family: Arial, sans-serif; margin: 0; padding: 0; } ` +
-      `.etiqueta { border: 2px solid #2c3e50; padding: 8px; width: 10cm; height: 8cm; background: white; box-sizing: border-box; position: relative; overflow: hidden; } ` +
-      `.watermark-vencido { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-size: 48px; font-weight: 800; color: rgba(192, 57, 43, 0.2); letter-spacing: 4px; z-index: 1; pointer-events: none; white-space: nowrap; } ` +
+      `.etiqueta { border: 2px solid #2c3e50; padding: 12px 16px; width: 15cm; background: white; box-sizing: border-box; position: relative; overflow: hidden; display: inline-block; } ` +
+      `.watermark-vencido { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-size: 64px; font-weight: 800; color: rgba(192, 57, 43, 0.2); letter-spacing: 6px; z-index: 1; pointer-events: none; white-space: nowrap; } ` +
       `</style>` +
       `</head><body>` +
       element.innerHTML +
@@ -48,33 +101,35 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
     const element = printRef.current;
     if (!element) return;
 
-    // 10cm × 8cm at 96 DPI → ~378 × 302 px
+    const rect = element.getBoundingClientRect();
+    const scale = 2;
     const canvas = document.createElement('canvas');
-    canvas.width = 378;
-    canvas.height = 302;
+    canvas.width = rect.width * scale;
+    canvas.height = rect.height * scale;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    ctx.scale(scale, scale);
     ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, 378, 302);
+    ctx.fillRect(0, 0, rect.width, rect.height);
 
     ctx.strokeStyle = '#2c3e50';
     ctx.lineWidth = 2;
-    ctx.strokeRect(2, 2, 374, 298);
+    ctx.strokeRect(1, 1, rect.width - 2, rect.height - 2);
 
     if (isVencido) {
       ctx.save();
-      ctx.translate(189, 151);
+      ctx.translate(rect.width / 2, rect.height / 2);
       ctx.rotate((-28 * Math.PI) / 180);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(192, 57, 43, 0.2)';
-      ctx.font = 'bold 56px Arial';
+      ctx.font = 'bold 72px Arial';
       ctx.fillText('EXPIRED', 0, 0);
       ctx.restore();
     }
 
-    const data = [
+    const rows = [
       entrada.reagente?.nome || 'Reagent',
       `Code: ${entrada.codigoInterno}`,
       entrada.categoria ? `Category: ${entrada.categoria}` : '',
@@ -88,14 +143,13 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
     ].filter(Boolean);
 
     ctx.fillStyle = '#2c3e50';
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(data[0], 16, 28);
-
-    ctx.font = '10px Arial';
-    let y = 48;
-    for (const line of data.slice(1)) {
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText(rows[0], 16, 32);
+    ctx.font = '12px Arial';
+    let y = 56;
+    for (const line of rows.slice(1)) {
       ctx.fillText(line, 16, y);
-      y += 22;
+      y += 24;
     }
 
     canvas.toBlob((blob) => {
@@ -114,210 +168,195 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
     : '-';
 
   return (
-    <div className="space-y-4">
-      <div
-        ref={printRef}
-        className="etiqueta"
-        style={{
-          width: '10cm',
-          height: '8cm',
-          border: '2px solid #2c3e50',
-          padding: '8px',
-          backgroundColor: 'white',
-          fontFamily: 'Arial, sans-serif',
-          pageBreakAfter: 'always',
-          position: 'relative',
-          overflow: 'hidden',
-          boxSizing: 'border-box',
-        }}
-      >
-        {isVencido && (
+    <>
+      <style>{buttonStyles}</style>
+
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '20px' }}>
+
+        {/* Cut guide + label */}
+        <div className="cut-guide-wrapper">
+
+          {/* The actual label */}
           <div
+            ref={printRef}
             style={{
-              position: 'absolute',
-              top: '45%',
-              left: '50%',
-              transform: 'translate(-50%, -50%) rotate(-28deg)',
-              fontSize: '48px',
-              fontWeight: 800,
-              color: 'rgba(192, 57, 43, 0.2)',
-              letterSpacing: '4px',
-              zIndex: 1,
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
+              width: '15cm',
+              height: 'auto',
+              border: '2px solid #2c3e50',
+              padding: '12px 16px',
+              backgroundColor: 'white',
+              fontFamily: 'Arial, sans-serif',
+              pageBreakAfter: 'always',
+              position: 'relative',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              display: 'block',
             }}
           >
-            EXPIRED
-          </div>
-        )}
+            {isVencido && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '45%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%) rotate(-28deg)',
+                  fontSize: '64px',
+                  fontWeight: 800,
+                  color: 'rgba(192, 57, 43, 0.2)',
+                  letterSpacing: '6px',
+                  zIndex: 1,
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                EXPIRED
+              </div>
+            )}
 
-        {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '6px',
-            paddingBottom: '6px',
-            borderBottom: '1px solid #ecf0f1',
-          }}
-        >
-          {logoUrl && (
-            <div style={{ width: '36px', height: '36px', position: 'relative', flexShrink: 0 }}>
-              <Image
-                src={logoUrl}
-                alt="LERP Logo"
-                fill
-                style={{ objectFit: 'contain' }}
-              />
-            </div>
-          )}
-          <div style={{ textAlign: 'center', flex: 1, paddingLeft: '6px' }}>
-            <h2
+            {/* Header */}
+            <div
               style={{
-                margin: 0,
-                fontSize: '13px',
-                fontWeight: 'bold',
-                color: '#2c3e50',
-                lineHeight: 1.2,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px',
+                paddingBottom: '8px',
+                borderBottom: '1.5px solid #ecf0f1',
               }}
             >
-              {entrada.reagente?.nome}
-            </h2>
-            <p
+              {logoUrl && (
+                <div style={{ width: '48px', height: '48px', position: 'relative', flexShrink: 0 }}>
+                  <Image src={logoUrl} alt="LERP Logo" fill style={{ objectFit: 'contain' }} />
+                </div>
+              )}
+              <div style={{ textAlign: 'center', flex: 1, paddingLeft: '10px' }}>
+                <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#2c3e50', lineHeight: 1.2 }}>
+                  {entrada.reagente?.nome}
+                </h2>
+                <p style={{ margin: '3px 0 0 0', fontSize: '9px', color: '#7f8c8d' }}>
+                  LERP — Laboratório de Engenharia de Reações Poliméricas
+                </p>
+              </div>
+            </div>
+
+            {/* Internal Code + Concentration */}
+            <div
               style={{
-                margin: '2px 0 0 0',
-                fontSize: '8px',
-                color: '#7f8c8d',
+                backgroundColor: '#ecf0f1',
+                padding: '7px 10px',
+                borderRadius: '4px',
+                marginBottom: '10px',
+                display: 'grid',
+                gridTemplateColumns: entrada.concentracao ? '1fr 1fr' : '1fr',
+                gap: '10px',
               }}
             >
-              LERP - Laboratório de Engenharia de Reações Poliméricas
-            </p>
+              <div>
+                <p style={{ margin: '0 0 2px 0', fontSize: '9px', color: '#7f8c8d', fontWeight: 'bold' }}>
+                  INTERNAL CODE:
+                </p>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: '#2c3e50', fontFamily: 'monospace' }}>
+                  {entrada.codigoInterno}
+                </p>
+              </div>
+              {entrada.concentracao && (
+                <div>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '9px', color: '#7f8c8d', fontWeight: 'bold' }}>
+                    CONCENTRATION:
+                  </p>
+                  <p style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: '#2c3e50' }}>
+                    {entrada.concentracao}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Details */}
+            {(entrada.categoria || entrada.localizacao || entrada.dataValidade || entrada.responsavel) && (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '8px 16px',
+                  marginBottom: '10px',
+                }}
+              >
+                {entrada.categoria && (
+                  <div>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '9px', color: '#7f8c8d', fontWeight: 'bold' }}>CATEGORY:</p>
+                    <p style={{ margin: 0, fontSize: '11px', color: '#2c3e50' }}>{entrada.categoria}</p>
+                  </div>
+                )}
+                {entrada.localizacao && (
+                  <div>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '9px', color: '#7f8c8d', fontWeight: 'bold' }}>📍 LOCATION:</p>
+                    <p style={{ margin: 0, fontSize: '11px', color: '#2c3e50' }}>{entrada.localizacao}</p>
+                  </div>
+                )}
+                {entrada.dataValidade && (
+                  <div>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '9px', color: '#7f8c8d', fontWeight: 'bold' }}>EXPIRY DATE:</p>
+                    <p style={{ margin: 0, fontSize: '11px', color: '#2c3e50' }}>{dataValidadeFormatada}</p>
+                  </div>
+                )}
+                {entrada.responsavel && (
+                  <div>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '9px', color: '#7f8c8d', fontWeight: 'bold' }}>RESPONSIBLE:</p>
+                    <p style={{ margin: 0, fontSize: '11px', color: '#2c3e50' }}>{entrada.responsavel}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Hazard warning */}
+            {entrada.perigos && (
+              <div
+                style={{
+                  backgroundColor: '#ffe8e8',
+                  border: '1px solid #e74c3c',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
+                  marginBottom: '10px',
+                }}
+              >
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 'bold', color: '#c0392b' }}>
+                  ⚠️ {entrada.perigos}
+                </p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div
+              style={{
+                fontSize: '9px',
+                color: '#95a5a6',
+                borderTop: '1px solid #ecf0f1',
+                paddingTop: '6px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0 14px',
+              }}
+            >
+              <span>Entry: {new Date(entrada.dataEntrada).toLocaleDateString('en-US')}</span>
+              {entrada.fornecedor && <span>Supplier: {entrada.fornecedor}</span>}
+              {entrada.notaFiscal && <span>Invoice: {entrada.notaFiscal}</span>}
+            </div>
           </div>
         </div>
 
-        {/* Internal Code + Concentration */}
-        <div
-          style={{
-            backgroundColor: '#ecf0f1',
-            padding: '5px 8px',
-            borderRadius: '3px',
-            marginBottom: '6px',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '8px',
-          }}
-        >
-          <div>
-            <p style={{ margin: '0 0 2px 0', fontSize: '8px', color: '#7f8c8d', fontWeight: 'bold' }}>
-              INTERNAL CODE:
-            </p>
-            <p style={{ margin: 0, fontSize: '11px', fontWeight: 'bold', color: '#2c3e50', fontFamily: 'monospace' }}>
-              {entrada.codigoInterno}
-            </p>
-          </div>
-          {entrada.concentracao && (
-            <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '8px', color: '#7f8c8d', fontWeight: 'bold' }}>
-                CONCENTRATION:
-              </p>
-              <p style={{ margin: 0, fontSize: '11px', fontWeight: 'bold', color: '#2c3e50' }}>
-                {entrada.concentracao}
-              </p>
-            </div>
-          )}
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: '10px', paddingLeft: '12px' }}>
+          <button className="label-btn label-btn-print" onClick={handlePrint}>
+            <span className="btn-icon">🖨️</span>
+            Print Label
+          </button>
+          <button className="label-btn label-btn-download" onClick={handleDownload}>
+            <span className="btn-icon">⬇️</span>
+            Download PNG
+          </button>
         </div>
 
-        {/* Details grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '6px',
-            marginBottom: '6px',
-          }}
-        >
-          {entrada.categoria && (
-            <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '8px', color: '#7f8c8d', fontWeight: 'bold' }}>
-                CATEGORY:
-              </p>
-              <p style={{ margin: 0, fontSize: '10px', color: '#2c3e50' }}>{entrada.categoria}</p>
-            </div>
-          )}
-          {entrada.localizacao && (
-            <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '8px', color: '#7f8c8d', fontWeight: 'bold' }}>
-                📍 LOCATION:
-              </p>
-              <p style={{ margin: 0, fontSize: '10px', color: '#2c3e50' }}>{entrada.localizacao}</p>
-            </div>
-          )}
-          {entrada.dataValidade && (
-            <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '8px', color: '#7f8c8d', fontWeight: 'bold' }}>
-                EXPIRY DATE:
-              </p>
-              <p style={{ margin: 0, fontSize: '10px', color: '#2c3e50' }}>{dataValidadeFormatada}</p>
-            </div>
-          )}
-          {entrada.responsavel && (
-            <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '8px', color: '#7f8c8d', fontWeight: 'bold' }}>
-                RESPONSIBLE:
-              </p>
-              <p style={{ margin: 0, fontSize: '10px', color: '#2c3e50' }}>{entrada.responsavel}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Hazard warning */}
-        {entrada.perigos && (
-          <div
-            style={{
-              backgroundColor: '#ffe8e8',
-              border: '1px solid #e74c3c',
-              padding: '4px 8px',
-              borderRadius: '3px',
-              marginBottom: '6px',
-            }}
-          >
-            <p style={{ margin: 0, fontSize: '9px', fontWeight: 'bold', color: '#c0392b' }}>
-              ⚠️ {entrada.perigos}
-            </p>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div
-          style={{
-            fontSize: '8px',
-            color: '#95a5a6',
-            borderTop: '1px solid #ecf0f1',
-            paddingTop: '4px',
-          }}
-        >
-          <span>Entry: {new Date(entrada.dataEntrada).toLocaleDateString('en-US')}</span>
-          {entrada.fornecedor && <span style={{ marginLeft: '10px' }}>Supplier: {entrada.fornecedor}</span>}
-          {entrada.notaFiscal && <span style={{ marginLeft: '10px' }}>Invoice: {entrada.notaFiscal}</span>}
-        </div>
       </div>
-
-      {/* Action buttons */}
-      <div className="flex gap-3 justify-center">
-        <button
-          onClick={handlePrint}
-          className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          🖨️ Print
-        </button>
-        <button
-          onClick={handleDownload}
-          className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-        >
-          ⬇️ Download
-        </button>
-      </div>
-    </div>
+    </>
   );
 }
