@@ -76,8 +76,13 @@ const buttonStyles = `
   }
 `;
 
-// Fully inlined HTML for print/download — mirrors the JSX layout exactly
-function buildLabelHtml(entrada: ReagenteEntrada & { reagente?: Reagente }, isVencido: boolean, logoUrl?: string) {
+// Fully inlined HTML — mirrors the JSX layout with all styles inline
+// Used for both Print and Download so output is always pixel-perfect
+function buildLabelHtml(
+  entrada: ReagenteEntrada & { reagente?: Reagente },
+  isVencido: boolean,
+  logoUrl?: string
+) {
   const dataValidadeFormatada = entrada.dataValidade
     ? new Date(entrada.dataValidade).toLocaleDateString('en-US')
     : '-';
@@ -140,6 +145,31 @@ function buildLabelHtml(entrada: ReagenteEntrada & { reagente?: Reagente }, isVe
     </div>`;
 }
 
+function openLabelWindow(
+  entrada: ReagenteEntrada & { reagente?: Reagente },
+  isVencido: boolean,
+  logoUrl?: string
+) {
+  const labelHtml = buildLabelHtml(entrada, isVencido, logoUrl);
+  const win = window.open('', '', 'height=600,width=900');
+  if (!win) return;
+  win.document.write(`
+    <html>
+      <head>
+        <title>Label - ${entrada.reagente?.nome ?? ''}</title>
+        <style>
+          @page { size: 15cm auto; margin: 0; }
+          body { margin: 0; padding: 0; }
+          * { box-sizing: border-box; }
+        </style>
+      </head>
+      <body>${labelHtml}</body>
+    </html>`);
+  win.document.close();
+  win.focus();
+  return win;
+}
+
 export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -152,50 +182,16 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
     return validade < hoje;
   })();
 
+  // Opens the label in a new window and triggers the browser print dialog
   const handlePrint = () => {
-    const labelHtml = buildLabelHtml(entrada, isVencido, logoUrl);
-    const printWindow = window.open('', '', 'height=600,width=900');
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Label - ${entrada.reagente?.nome}</title>
-          <style>
-            @page { size: 15cm auto; margin: 0; }
-            body { margin: 0; padding: 0; }
-            * { box-sizing: border-box; }
-          </style>
-        </head>
-        <body>${labelHtml}</body>
-      </html>`);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 300);
+    const win = openLabelWindow(entrada, isVencido, logoUrl);
+    if (!win) return;
+    setTimeout(() => win.print(), 300);
   };
 
-  const handleDownload = async () => {
-    const element = printRef.current;
-    if (!element) return;
-
-    // Dynamically import html2canvas to avoid SSR issues
-    const html2canvas = (await import('html2canvas')).default;
-
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-    });
-
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `label-${entrada.codigoInterno}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }, 'image/png');
+  // Opens the label in a new window — user can Save as PDF / image from print dialog
+  const handleDownload = () => {
+    openLabelWindow(entrada, isVencido, logoUrl);
   };
 
   const dataValidadeFormatada = entrada.dataValidade
@@ -233,7 +229,7 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
                   {entrada.reagente?.nome}
                 </h2>
                 <p style={{ margin: '3px 0 0 0', fontSize: '9px', color: '#7f8c8d' }}>
-                  LERP — Laboratório de Engenharia de Reações Poliméricas
+                  LERP — Polymer Reaction Engineering Laboratory
                 </p>
               </div>
             </div>
@@ -306,7 +302,7 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
           </button>
           <button className="label-btn label-btn-download" onClick={handleDownload}>
             <span className="btn-icon">⬇️</span>
-            Download PNG
+            Save / Export
           </button>
         </div>
 
