@@ -22,7 +22,7 @@ const buttonStyles = `
     font-weight: 600;
     letter-spacing: 0.4px;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
     position: relative;
     overflow: hidden;
   }
@@ -47,10 +47,7 @@ const buttonStyles = `
     color: white;
     box-shadow: 0 3px 10px rgba(26,122,74,0.35);
   }
-  .btn-icon {
-    font-size: 15px;
-    line-height: 1;
-  }
+  .btn-icon { font-size: 15px; line-height: 1; }
 
   /* Cut guide wrapper */
   .cut-guide-wrapper {
@@ -59,6 +56,26 @@ const buttonStyles = `
     padding: 12px;
     border: 1.5px dashed #aab0b8;
     border-radius: 2px;
+  }
+
+  /* Watermark via ::before on the label box — no extra DOM node, no height impact */
+  .etiqueta-box {
+    position: relative;
+  }
+  .etiqueta-box.vencido::before {
+    content: 'EXPIRED';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-28deg);
+    font-size: 64px;
+    font-weight: 800;
+    color: rgba(192, 57, 43, 0.18);
+    letter-spacing: 6px;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 2;
+    font-family: Arial, sans-serif;
   }
 `;
 
@@ -86,8 +103,8 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
       `<style>` +
       `@page { size: 15cm auto; margin: 0; } ` +
       `body { font-family: Arial, sans-serif; margin: 0; padding: 0; } ` +
-      `.etiqueta { border: 2px solid #2c3e50; padding: 12px 16px; width: 15cm; background: white; box-sizing: border-box; position: relative; overflow: hidden; display: inline-block; } ` +
-      `.watermark-vencido { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-size: 64px; font-weight: 800; color: rgba(192, 57, 43, 0.2); letter-spacing: 6px; z-index: 1; pointer-events: none; white-space: nowrap; } ` +
+      `.etiqueta-box { border: 2px solid #2c3e50; padding: 12px 16px; width: 15cm; background: white; box-sizing: border-box; position: relative; } ` +
+      `.etiqueta-box.vencido::before { content: 'EXPIRED'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-size: 64px; font-weight: 800; color: rgba(192,57,43,0.18); letter-spacing: 6px; pointer-events: none; white-space: nowrap; z-index: 2; font-family: Arial, sans-serif; } ` +
       `</style>` +
       `</head><body>` +
       element.innerHTML +
@@ -179,39 +196,16 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
           {/* The actual label */}
           <div
             ref={printRef}
+            className={`etiqueta-box${isVencido ? ' vencido' : ''}`}
             style={{
               width: '15cm',
-              height: 'auto',
               border: '2px solid #2c3e50',
               padding: '12px 16px',
               backgroundColor: 'white',
               fontFamily: 'Arial, sans-serif',
-              pageBreakAfter: 'always',
-              position: 'relative',
-              overflow: 'hidden',
               boxSizing: 'border-box',
-              display: 'block',
             }}
           >
-            {isVencido && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '45%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%) rotate(-28deg)',
-                  fontSize: '64px',
-                  fontWeight: 800,
-                  color: 'rgba(192, 57, 43, 0.2)',
-                  letterSpacing: '6px',
-                  zIndex: 1,
-                  pointerEvents: 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                EXPIRED
-              </div>
-            )}
 
             {/* Header */}
             <div
@@ -234,7 +228,7 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
                   {entrada.reagente?.nome}
                 </h2>
                 <p style={{ margin: '3px 0 0 0', fontSize: '9px', color: '#7f8c8d' }}>
-                  LERP — Laboratório de Engenharia de Reações Poliméricas
+                  LERP — Polymer Reaction Engineering Laboratory
                 </p>
               </div>
             </div>
