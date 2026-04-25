@@ -375,10 +375,8 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
             <option value="Crosslinker">Crosslinker</option>
             <option value="Catalyst">Catalyst</option>
             <option value="Photoinitiator">Photoinitiator</option>
-            <option value="Oxidizer / Reducer">Oxidizer / Reducer</option>
             <option value="Nanomaterial">Nanomaterial</option>
             <option value="Analytical">Analytical</option>
-            <option value="Controlled Substance">Controlled Substance</option>
             <option value="Microbiology">Microbiology</option>
             <option value="Inorganic Salt">Inorganic Salt</option>
             <option value="Thiol">Thiol</option>
@@ -446,12 +444,19 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div className="form-group">
-        <label>Hazard Warnings (e.g. ⚠️ Flammable)</label>
-        <input
-          type="text"
-          value={formData.perigos}
-          onChange={(e) => setFormData({ ...formData, perigos: e.target.value })}
-          placeholder="e.g. Flammable, Toxic"
+        <label>Category</label>
+          <select
+            value={formData.perigos}
+             onChange={(e) => setFormData({ ...formData, perigos: e.target.value })}
+          >
+            <option value="">Select a category</option>
+            <option value="Flammable">Flammable</option>
+            <option value="Controlled">Controlled</option>
+            <option value="Refrigerated">Refrigerated</option>
+            <option value="Corrosive">Corrosive</option>
+            <option value="Oxidizer">Oxidizer</option>
+            <option value="Inert">Inert</option>
+          </select>
         />
       </div>
 
