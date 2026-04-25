@@ -2,8 +2,32 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
 export const dynamic = "force-dynamic";
+
+// Maps English category names to their single-letter code
+const CATEGORY_LETTER: Record<string, string> = {
+  "Solvent":              "S",
+  "Acid":                 "A",
+  "Base":                 "B",
+  "Monomer":              "M",
+  "Polymer":              "P",
+  "Crosslinker":          "X",
+  "Catalyst":             "C",
+  "Photoinitiator":       "F",
+  "Oxidizer / Reducer":   "O",
+  "Nanomaterial":         "N",
+  "Analytical":           "L",
+  "Controlled Substance": "K",
+  "Microbiology":         "G",
+  "Inorganic Salt":       "I",
+  "Thiol":                "T",
+};
+
+function generateCodigoInterno(categoria: string): string {
+  const letter = CATEGORY_LETTER[categoria] ?? "U"; // U = Unknown
+  const digits = Math.floor(1000 + Math.random() * 9000).toString(); // 4 random digits
+  return `LERP-${letter}${digits}`;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +35,6 @@ export async function GET(request: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
     }
-
     const reagentes = await prisma.reagente.findMany({
       select: {
         id: true,
@@ -31,9 +54,8 @@ export async function GET(request: NextRequest) {
           take: 1,
         },
       },
-      orderBy: { nome: 'asc' },
+      orderBy: { nome: "asc" },
     });
-
     return NextResponse.json(reagentes);
   } catch (error: any) {
     return NextResponse.json(
@@ -73,13 +95,8 @@ export async function POST(request: NextRequest) {
       responsavel,
     } = body;
 
-    const codigoInterno = `LERP-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
-    // Check if reagente exists by name
-    let reagente = await prisma.reagente.findFirst({
-      where: { nome },
-    });
-
+    // Upsert the reagente
+    let reagente = await prisma.reagente.findFirst({ where: { nome } });
     if (!reagente) {
       reagente = await prisma.reagente.create({
         data: { nome, marca, volume, localidade, status: "ok" },
@@ -91,29 +108,49 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const entrada = await prisma.reagenteEntrada.create({
-      data: {
-        reagenteId: reagente.id,
-        usuarioId: session.user.id,
-        dataEntrada: new Date(dataEntrada),
-        fornecedor,
-        notaFiscal,
-        volume,
-        marca,
-        quantidade,
-        codigoInterno,
-        localizacao: localidade,
-        observacoes,
-        categoria,
-        concentracao,
-        dataValidade: dataValidade ? new Date(dataValidade) : null,
-        perigos,
-        responsavel: responsavel || user?.name || "Não informado",
-      },
-      include: { reagente: true },
-    });
+    // Create one entrada per bottle (quantidade), each with its own unique code
+    const qty = Math.max(1, parseInt(quantidade) || 1);
+    const entradas = [];
 
-    return NextResponse.json(entrada, { status: 201 });
+    for (let i = 0; i < qty; i++) {
+      // Keep regenerating until the code is unique in the DB
+      let codigoInterno: string;
+      let exists = true;
+      do {
+        codigoInterno = generateCodigoInterno(categoria);
+        const found = await prisma.reagenteEntrada.findFirst({
+          where: { codigoInterno },
+        });
+        exists = !!found;
+      } while (exists);
+
+      const entrada = await prisma.reagenteEntrada.create({
+        data: {
+          reagenteId: reagente.id,
+          usuarioId: session.user.id,
+          dataEntrada: new Date(dataEntrada),
+          fornecedor,
+          notaFiscal,
+          volume,
+          marca,
+          quantidade: 1, // each entry represents a single bottle
+          codigoInterno,
+          localizacao: localidade,
+          observacoes,
+          categoria,
+          concentracao,
+          dataValidade: dataValidade ? new Date(dataValidade) : null,
+          perigos,
+          responsavel: responsavel || user?.name || "Não informado",
+        },
+        include: { reagente: true },
+      });
+
+      entradas.push(entrada);
+    }
+
+    // Return array (even for qty=1, always an array so the frontend handles it uniformly)
+    return NextResponse.json(entradas, { status: 201 });
   } catch (error: any) {
     console.error("Reagente POST error:", error);
     return NextResponse.json(
