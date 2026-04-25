@@ -23,7 +23,7 @@ export default function SignupPage() {
     setLoading(true);
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Senhas não correspondem');
+      setError('Passwords do not match');
       setLoading(false);
       return;
     }
@@ -42,14 +42,14 @@ export default function SignupPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || 'Erro ao criar conta');
+        setError(data.message || 'Error creating account');
       } else {
         setSuccess(true);
         setFormData({ name: '', email: '', password: '', confirmPassword: '' });
         setTimeout(() => router.push('/login'), 2000);
       }
     } catch (err: any) {
-      setError(err?.message || 'Erro ao criar conta');
+      setError(err?.message || 'Error creating account');
     } finally {
       setLoading(false);
     }
@@ -62,8 +62,8 @@ export default function SignupPage() {
           <div style={{ position: 'relative', width: '80px', height: '80px', margin: '0 auto 1rem' }}>
             <Image src="/logo.png" alt="LERP Logo" fill style={{ objectFit: 'contain' }} />
           </div>
-          <h1 style={{ fontSize: '1.5rem', color: '#1a1a2e' }}>Criar Conta</h1>
-          <p style={{ color: '#666', marginTop: '0.5rem' }}>Cadastro na Intranet LERP</p>
+          <h1 style={{ fontSize: '1.5rem', color: '#1a1a2e' }}>Create Account</h1>
+          <p style={{ color: '#666', marginTop: '0.5rem' }}>Registration on the LERP Intranet</p>
         </div>
 
         {error && <div style={{ background: '#f8d7da', color: '#721c24', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
@@ -77,7 +77,7 @@ export default function SignupPage() {
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              placeholder="Seu Nome"
+              placeholder="Your Name"
               disabled={loading}
               style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.95rem' }}
             />
@@ -90,14 +90,14 @@ export default function SignupPage() {
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              placeholder="seu@email.com"
+              placeholder="your@email.com"
               disabled={loading}
               style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.95rem' }}
             />
           </div>
 
           <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Senha</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Password</label>
             <input
               type="password"
               name="password"
@@ -110,7 +110,7 @@ export default function SignupPage() {
           </div>
 
           <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Confirmar Senha</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Confirm Password</label>
             <input
               type="password"
               name="confirmPassword"
@@ -127,12 +127,12 @@ export default function SignupPage() {
             disabled={loading}
             style={{ width: '100%', padding: '0.75rem', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}
           >
-            {loading ? 'Criando conta...' : 'Criar Conta'}
+            {loading ? 'Creating an account...' : 'Create Account'}
           </button>
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '2rem', color: '#666', fontSize: '0.9rem' }}>
-          Já tem conta? <Link href="/login" style={{ color: '#3498db', textDecoration: 'none', fontWeight: 500 }}>Fazer login</Link>
+          Do you already have an account? <Link href="/login" style={{ color: '#3498db', textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>
         </p>
       </div>
     </div>
