@@ -1,12 +1,12 @@
 'use client';
- 
+
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import EtiquetaReagente from '@/components/EtiquetaReagente';
- 
+
 interface Reagent {
   id: string;
   nome: string;
@@ -20,7 +20,7 @@ interface Reagent {
     localizacao: string | null;
   }[];
 }
- 
+
 export default function ReagentesPage() {
   const { data: session, status } = useSession() || {};
   const router = useRouter();
@@ -28,19 +28,19 @@ export default function ReagentesPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('consulta');
   const [user, setUser] = useState<any>(null);
- 
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.replace('/login');
     }
   }, [status, router]);
- 
+
   useEffect(() => {
     if (session?.user?.id) {
       fetchUserAndReagentes();
     }
   }, [session]);
- 
+
   const fetchUserAndReagentes = async () => {
     try {
       const userRes = await fetch('/api/auth/me');
@@ -48,7 +48,7 @@ export default function ReagentesPage() {
         const userData = await userRes.json();
         setUser(userData);
       }
- 
+
       const reagentesRes = await fetch('/api/reagentes');
       if (reagentesRes.ok) {
         const data = await reagentesRes.json();
@@ -60,14 +60,14 @@ export default function ReagentesPage() {
       setLoading(false);
     }
   };
- 
+
   if (status === 'loading' || loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
- 
+
   const isAdmin = user?.category === 'Admin';
   const isPosGraduando = user?.category === 'Pos-graduando';
- 
+
   return (
     <div>
       <header className="header">
@@ -88,10 +88,10 @@ export default function ReagentesPage() {
           </div>
         </div>
       </header>
- 
+
       <main className="container">
         <h2 className="page-title">Reagent Management</h2>
- 
+
         {(isPosGraduando || isAdmin) && (
           <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', borderBottom: '2px solid #e0e0e0' }}>
             <button
@@ -114,7 +114,7 @@ export default function ReagentesPage() {
             </button>
           </div>
         )}
- 
+
         {tab === 'consulta' && <ConsultaReagentes />}
         {tab === 'entrada' && (isPosGraduando || isAdmin) && <EntradaForm onSuccess={fetchUserAndReagentes} />}
         {tab === 'saida' && (isPosGraduando || isAdmin) && <SaidaForm reagentes={reagentes} onSuccess={fetchUserAndReagentes} />}
@@ -122,23 +122,23 @@ export default function ReagentesPage() {
     </div>
   );
 }
- 
+
 function ConsultaReagentes() {
   const [reagentes, setReagentes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [filtros, setFiltros] = useState({ nome: '', marca: '' });
- 
+
   useEffect(() => {
     fetchReagentes();
   }, []);
- 
+
   const fetchReagentes = async (nome = '', marca = '') => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (nome) params.append('nome', nome);
       if (marca) params.append('marca', marca);
- 
+
       const res = await fetch(`/api/reagentes/consulta?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
@@ -150,17 +150,17 @@ function ConsultaReagentes() {
       setLoading(false);
     }
   };
- 
+
   const handleFilterChange = (field: string, value: string) => {
     const novosFiltros = { ...filtros, [field]: value };
     setFiltros(novosFiltros);
     fetchReagentes(novosFiltros.nome, novosFiltros.marca);
   };
- 
+
   return (
     <div>
       <h3 style={{ marginBottom: '1.5rem' }}>🔍 Check Inventory</h3>
- 
+
       <div
         style={{
           display: 'grid',
@@ -191,7 +191,7 @@ function ConsultaReagentes() {
           />
         </div>
       </div>
- 
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>
       ) : reagentes.length === 0 ? (
@@ -236,11 +236,11 @@ function ConsultaReagentes() {
     </div>
   );
 }
- 
+
 function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [etiqueta, setEtiqueta] = useState<any>(null);
+  const [etiquetas, setEtiquetas] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     nome: '',
     marca: '',
@@ -256,24 +256,24 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
     perigos: '',
     responsavel: '',
   });
- 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-    setEtiqueta(null);
- 
+    setEtiquetas([]);
+
     try {
       const res = await fetch('/api/reagentes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
- 
+
       if (res.ok) {
-        const data = await res.json();
-        setEtiqueta(data);
-        setMessage('Reagent successfully added!');
+        const data = await res.json(); // always an array
+        setEtiquetas(data);
+        setMessage(`Reagent successfully added! ${data.length} label${data.length > 1 ? 's' : ''} generated.`);
         setTimeout(() => {
           setFormData({
             nome: '',
@@ -301,14 +301,28 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
       setLoading(false);
     }
   };
- 
-  if (etiqueta) {
+
+  if (etiquetas.length > 0) {
     return (
       <div>
-        <h3 style={{ marginBottom: '1rem', color: '#27ae60' }}>✅ Generated Label</h3>
-        <EtiquetaReagente entrada={etiqueta} logoUrl="/logo.png" />
+        <h3 style={{ marginBottom: '0.5rem', color: '#27ae60' }}>✅ Generated Label{etiquetas.length > 1 ? 's' : ''}</h3>
+        <p style={{ marginBottom: '1.5rem', color: '#7f8c8d', fontSize: '14px' }}>
+          {etiquetas.length} label{etiquetas.length > 1 ? 's' : ''} generated — one per bottle.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {etiquetas.map((entrada, idx) => (
+            <div key={entrada.id}>
+              {etiquetas.length > 1 && (
+                <p style={{ marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '13px', color: '#555' }}>
+                  Bottle {idx + 1} of {etiquetas.length} — <code>{entrada.codigoInterno}</code>
+                </p>
+              )}
+              <EtiquetaReagente entrada={entrada} logoUrl="/logo.png" />
+            </div>
+          ))}
+        </div>
         <button
-          onClick={() => setEtiqueta(null)}
+          onClick={() => setEtiquetas([])}
           style={{
             marginTop: '2rem',
             padding: '0.75rem 1.5rem',
@@ -324,7 +338,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
     );
   }
- 
+
   return (
     <form onSubmit={handleSubmit} style={{ maxWidth: '700px', margin: '0 auto' }}>
       <div className="form-group">
@@ -336,7 +350,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           required
         />
       </div>
- 
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
           <label>Brand</label>
@@ -347,15 +361,31 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
         <div className="form-group">
-          <label>Category (e.g. Organic)</label>
-          <input
-            type="text"
+          <label>Category</label>
+          <select
             value={formData.categoria}
             onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-          />
+          >
+            <option value="">Select a category</option>
+            <option value="Solvent">Solvent</option>
+            <option value="Acid">Acid</option>
+            <option value="Base">Base</option>
+            <option value="Monomer">Monomer</option>
+            <option value="Polymer">Polymer</option>
+            <option value="Crosslinker">Crosslinker</option>
+            <option value="Catalyst">Catalyst</option>
+            <option value="Photoinitiator">Photoinitiator</option>
+            <option value="Oxidizer / Reducer">Oxidizer / Reducer</option>
+            <option value="Nanomaterial">Nanomaterial</option>
+            <option value="Analytical">Analytical</option>
+            <option value="Controlled Substance">Controlled Substance</option>
+            <option value="Microbiology">Microbiology</option>
+            <option value="Inorganic Salt">Inorganic Salt</option>
+            <option value="Thiol">Thiol</option>
+          </select>
         </div>
       </div>
- 
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
           <label>Volume</label>
@@ -375,7 +405,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
- 
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
           <label>Location (e.g. CAB-03 | SHF-02)</label>
@@ -394,7 +424,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
- 
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
           <label>Supplier *</label>
@@ -414,7 +444,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
- 
+
       <div className="form-group">
         <label>Hazard Warnings (e.g. ⚠️ Flammable)</label>
         <input
@@ -424,7 +454,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           placeholder="e.g. Flammable, Toxic"
         />
       </div>
- 
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
           <label>Quantity *</label>
@@ -445,7 +475,7 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
- 
+
       <div className="form-group">
         <label>Entry Date</label>
         <input
@@ -454,11 +484,11 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           onChange={(e) => setFormData({ ...formData, dataEntrada: e.target.value })}
         />
       </div>
- 
+
       <button type="submit" disabled={loading} className="button button-primary">
         {loading ? 'Processing...' : '🏷️ Generate Label & Register'}
       </button>
- 
+
       {message && (
         <div className={message.includes('successfully') ? 'success-message' : 'error-message'}>
           {message}
@@ -467,44 +497,44 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
     </form>
   );
 }
- 
+
 function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagent[]; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [codigoInterno, setCodigoInterno] = useState('');
- 
+
   const reagentesComCodigo = reagentes.filter((r) => r.entradas?.[0]?.codigoInterno);
- 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
- 
+
     const reagenteSelecionado = reagentesComCodigo.find(
       (r) => r.entradas[0]?.codigoInterno === codigoInterno
     );
- 
+
     if (!reagenteSelecionado) {
       setMessage('Please select a valid reagent by internal code.');
       return;
     }
- 
+
     const confirmarExclusao = window.confirm(
       `Are you sure you want to permanently remove the reagent "${reagenteSelecionado.nome}" (code ${codigoInterno})? This action cannot be undone.`
     );
- 
+
     if (!confirmarExclusao) {
       return;
     }
- 
+
     setLoading(true);
     setMessage('');
- 
+
     try {
       const res = await fetch('/api/reagentes/saida', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ codigoInterno }),
       });
- 
+
       if (res.ok) {
         setMessage('Output recorded: reagent permanently removed.');
         setCodigoInterno('');
@@ -519,7 +549,7 @@ function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagent[]; onSuccess: 
       setLoading(false);
     }
   };
- 
+
   return (
     <form onSubmit={handleSubmit} style={{ maxWidth: '600px', margin: '0 auto' }}>
       <div className="form-group">
@@ -540,11 +570,11 @@ function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagent[]; onSuccess: 
           })}
         </select>
       </div>
- 
+
       <button type="submit" disabled={loading} className="button button-primary">
         {loading ? 'Removing...' : 'Confirm Output & Remove Reagent'}
       </button>
- 
+
       {message && (
         <div className={message.includes('recorded') ? 'success-message' : 'error-message'}>
           {message}
