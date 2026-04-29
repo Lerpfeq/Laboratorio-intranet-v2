@@ -218,7 +218,7 @@ model Agendamento {
 model RegistroResiduo {
   id                     String        @id @default(cuid())
   usuarioId              String
-  numeroRecipiente       Int           @unique
+  numeroRecipiente       Int
   composicao             String        @db.Text
   classe                 ClasseResiduo
   estado                 EstadoResiduo
