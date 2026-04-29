@@ -5,14 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { CLASSE_RESIDUO_VALUES } from '@/lib/residuos';
 
 type UserInfo = {
   id: string;
@@ -46,6 +38,7 @@ export default function CadastroResiduoPage() {
   const [loadingUser, setLoadingUser] = useState(true);
   const [saving, setSaving] = useState(false);
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [message, setMessage] = useState('');
 
   const [form, setForm] = useState({
     composicao: '',
@@ -83,8 +76,8 @@ export default function CadastroResiduoPage() {
           ...prev,
           responsavel: data?.name || data?.email || '',
         }));
-      } catch (error: any) {
-        toast.error(error?.message || 'Erro ao carregar usuário');
+      } catch (error) {
+        console.error('Erro ao carregar usuário:', error);
       } finally {
         setLoadingUser(false);
       }
@@ -98,6 +91,7 @@ export default function CadastroResiduoPage() {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setSaving(true);
+    setMessage('');
 
     try {
       const response = await fetch('/api/residuos', {
@@ -130,7 +124,7 @@ export default function CadastroResiduoPage() {
       }
 
       downloadBase64(data.etiquetaPdfBase64, data.etiquetaFileName, 'application/pdf');
-      toast.success(`Resíduo #${data.residuo.numeroRecipiente} cadastrado e etiqueta gerada.`);
+      setMessage(`Resíduo #${data.residuo.numeroRecipiente} cadastrado com sucesso e etiqueta gerada.`);
 
       setForm((prev) => ({
         ...prev,
@@ -147,7 +141,7 @@ export default function CadastroResiduoPage() {
         aminas: false,
       }));
     } catch (error: any) {
-      toast.error(error?.message || 'Erro ao cadastrar resíduo');
+      setMessage(error?.message || 'Erro ao cadastrar resíduo');
     } finally {
       setSaving(false);
     }
@@ -170,6 +164,7 @@ export default function CadastroResiduoPage() {
           <nav className="nav-tabs">
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/residuos">Resíduos</Link>
+            <Link href="/residuos/cadastro">Cadastro</Link>
             <Link href="/residuos/campanha">Campanha</Link>
           </nav>
           <div className="user-menu">
@@ -179,254 +174,269 @@ export default function CadastroResiduoPage() {
         </div>
       </header>
 
-      <main className="container space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="page-title !mb-0">Cadastro de Resíduo</h2>
-          <div className="flex gap-2">
-            <Link href="/residuos"><Button variant="outline">Voltar</Button></Link>
-            <Link href="/residuos/campanha"><Button>Ir para campanha</Button></Link>
-          </div>
+      <main className="container">
+        <h2 className="page-title">Cadastro de Resíduo</h2>
+
+        <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', borderBottom: '2px solid #e0e0e0' }}>
+          <Link href="/residuos/cadastro">
+            <button
+              style={{
+                padding: '0.75rem 1rem',
+                background: '#3498db',
+                color: 'white',
+                border: 'none',
+                cursor: 'pointer',
+                borderRadius: '4px 4px 0 0',
+              }}
+            >
+              Cadastro
+            </button>
+          </Link>
+          <Link href="/residuos/campanha">
+            <button
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'transparent',
+                color: '#333',
+                border: 'none',
+                cursor: 'pointer',
+                borderRadius: '4px 4px 0 0',
+              }}
+            >
+              Campanha
+            </button>
+          </Link>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Modelo de etiqueta de referência</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="max-w-xs border rounded p-2">
-              <Image
-                src="/etiqueta-residuo-modelo.jpeg"
-                width={340}
-                height={220}
-                alt="Modelo de etiqueta de resíduo"
-                style={{ width: '100%', height: 'auto' }}
+        <form onSubmit={handleSubmit} style={{ maxWidth: '900px', margin: '0 auto' }}>
+          <div className="form-group">
+            <label>Composição *</label>
+            <textarea
+              value={form.composicao}
+              onChange={(event) => setForm((prev) => ({ ...prev, composicao: event.target.value }))}
+              rows={3}
+              required
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Classe *</label>
+              <select
+                value={form.classe}
+                onChange={(event) => setForm((prev) => ({ ...prev, classe: event.target.value }))}
+                required
+              >
+                <option value="HC">HC</option>
+                <option value="OH">OH</option>
+                <option value="CN">CN</option>
+                <option value="CS">CS</option>
+                <option value="OF">OF</option>
+                <option value="OM">OM</option>
+                <option value="INORGANICO">Inorgânico</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Estado *</label>
+              <select
+                value={form.estado}
+                onChange={(event) => setForm((prev) => ({ ...prev, estado: event.target.value }))}
+                required
+              >
+                <option value="S">Sólido (S)</option>
+                <option value="L">Líquido (L)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Tipo de Recipiente *</label>
+              <input
+                type="text"
+                value={form.tipoRecipiente}
+                onChange={(event) => setForm((prev) => ({ ...prev, tipoRecipiente: event.target.value }))}
+                placeholder="Ex.: Frasco de vidro"
+                required
               />
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Dados do frasco</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-6" onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="composicao">Composição do resíduo</Label>
-                  <Textarea
-                    id="composicao"
-                    value={form.composicao}
-                    onChange={(event) => setForm((prev) => ({ ...prev, composicao: event.target.value }))}
-                    required
-                  />
-                </div>
+            <div className="form-group">
+              <label>Volume do Recipiente (L) *</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.volumeRecipienteLitros}
+                onChange={(event) => setForm((prev) => ({ ...prev, volumeRecipienteLitros: event.target.value }))}
+                required
+              />
+            </div>
+          </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="classe">Classe</Label>
-                  <select
-                    id="classe"
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-                    value={form.classe}
-                    onChange={(event) => setForm((prev) => ({ ...prev, classe: event.target.value }))}
-                    required
-                  >
-                    {CLASSE_RESIDUO_VALUES.map((classe) => (
-                      <option key={classe} value={classe}>
-                        {classe === 'INORGANICO' ? 'Inorgânico' : classe}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Responsável *</label>
+              <input
+                type="text"
+                value={form.responsavel}
+                onChange={(event) => setForm((prev) => ({ ...prev, responsavel: event.target.value }))}
+                required
+              />
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="estado">Estado</Label>
-                  <select
-                    id="estado"
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-                    value={form.estado}
-                    onChange={(event) => setForm((prev) => ({ ...prev, estado: event.target.value }))}
-                    required
-                  >
-                    <option value="S">Sólido (S)</option>
-                    <option value="L">Líquido (L)</option>
-                  </select>
-                </div>
+            <div className="form-group">
+              <label>Departamento *</label>
+              <input
+                type="text"
+                value={form.departamento}
+                onChange={(event) => setForm((prev) => ({ ...prev, departamento: event.target.value }))}
+                required
+              />
+            </div>
+          </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="tipoRecipiente">Tipo de recipiente</Label>
-                  <Input
-                    id="tipoRecipiente"
-                    value={form.tipoRecipiente}
-                    onChange={(event) => setForm((prev) => ({ ...prev, tipoRecipiente: event.target.value }))}
-                    placeholder="Ex.: Frasco de vidro"
-                    required
-                  />
-                </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Data *</label>
+              <input
+                type="date"
+                value={form.data}
+                onChange={(event) => setForm((prev) => ({ ...prev, data: event.target.value }))}
+                required
+              />
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="volumeRecipiente">Volume do recipiente (L)</Label>
-                  <Input
-                    id="volumeRecipiente"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.volumeRecipienteLitros}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, volumeRecipienteLitros: event.target.value }))
-                    }
-                    required
-                  />
-                </div>
+            <div className="form-group">
+              <label>pH</label>
+              <input
+                type="number"
+                min="0"
+                max="14"
+                step="0.1"
+                value={form.ph}
+                onChange={(event) => setForm((prev) => ({ ...prev, ph: event.target.value }))}
+              />
+            </div>
+          </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="responsavel">Responsável</Label>
-                  <Input
-                    id="responsavel"
-                    value={form.responsavel}
-                    onChange={(event) => setForm((prev) => ({ ...prev, responsavel: event.target.value }))}
-                    required
-                  />
-                </div>
+          <div className="form-group">
+            <label>Observações</label>
+            <textarea
+              value={form.observacoes}
+              onChange={(event) => setForm((prev) => ({ ...prev, observacoes: event.target.value }))}
+              rows={2}
+            />
+          </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="departamento">Departamento</Label>
-                  <Input
-                    id="departamento"
-                    value={form.departamento}
-                    onChange={(event) => setForm((prev) => ({ ...prev, departamento: event.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="data">Data</Label>
-                  <Input
-                    id="data"
-                    type="date"
-                    value={form.data}
-                    onChange={(event) => setForm((prev) => ({ ...prev, data: event.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="ph">pH</Label>
-                  <Input
-                    id="ph"
-                    type="number"
-                    min="0"
-                    max="14"
-                    step="0.1"
-                    value={form.ph}
-                    onChange={(event) => setForm((prev) => ({ ...prev, ph: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="observacoes">Observações</Label>
-                  <Textarea
-                    id="observacoes"
-                    value={form.observacoes}
-                    onChange={(event) => setForm((prev) => ({ ...prev, observacoes: event.target.value }))}
-                  />
-                </div>
+          <div
+            style={{
+              marginBottom: '1.5rem',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ background: '#ecf0f1', padding: '0.75rem 1rem', fontWeight: 600 }}>
+              Tabela de Composição (%)
+            </div>
+            <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Halogenados %</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={form.halogenadosPercentual}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, halogenadosPercentual: event.target.value }))
+                  }
+                />
               </div>
 
-              <div className="border rounded-md">
-                <div className="bg-muted px-4 py-2 text-sm font-semibold">Tabela de composição detalhada</div>
-                <div className="p-4 grid gap-3">
-                  <div className="grid grid-cols-2 gap-3 items-center">
-                    <Label htmlFor="halogenados">Halogenados (%)</Label>
-                    <Input
-                      id="halogenados"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={form.halogenadosPercentual}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, halogenadosPercentual: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 items-center">
-                    <Label htmlFor="acetonitrila">Acetonitrila (%)</Label>
-                    <Input
-                      id="acetonitrila"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={form.acetonitrilaPercentual}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, acetonitrilaPercentual: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 items-center">
-                    <Label htmlFor="metaisPesados">Metais Pesados (%)</Label>
-                    <Input
-                      id="metaisPesados"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={form.metaisPesadosPercentual}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, metaisPesadosPercentual: event.target.value }))
-                      }
-                    />
-                  </div>
-                </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Acetonitrila %</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={form.acetonitrilaPercentual}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, acetonitrilaPercentual: event.target.value }))
+                  }
+                />
               </div>
 
-              <div className="border rounded-md">
-                <div className="bg-muted px-4 py-2 text-sm font-semibold">Checklists de segurança</div>
-                <div className="p-4 grid gap-3">
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={form.presencaEnxofre}
-                      onCheckedChange={(checked) =>
-                        setForm((prev) => ({ ...prev, presencaEnxofre: Boolean(checked) }))
-                      }
-                    />
-                    Presença de enxofre/substâncias sulfuradas
-                  </label>
-
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={form.geradorCianetos}
-                      onCheckedChange={(checked) =>
-                        setForm((prev) => ({ ...prev, geradorCianetos: Boolean(checked) }))
-                      }
-                    />
-                    Gerador de cianetos
-                  </label>
-
-                  <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={form.aminas}
-                      onCheckedChange={(checked) =>
-                        setForm((prev) => ({ ...prev, aminas: Boolean(checked) }))
-                      }
-                    />
-                    Aminas
-                  </label>
-                </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Metais Pesados %</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={form.metaisPesadosPercentual}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, metaisPesadosPercentual: event.target.value }))
+                  }
+                />
               </div>
+            </div>
+          </div>
 
-              <div className="flex flex-wrap gap-3">
-                <Button disabled={saving} type="submit">
-                  {saving ? 'Salvando...' : 'Cadastrar e gerar etiqueta PDF'}
-                </Button>
-                <p className="text-sm text-muted-foreground self-center">
-                  A etiqueta é gerada com marca d'água "WASTE", ícone ⚠️ e aviso de 75% do volume.
-                </p>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+          <div
+            style={{
+              marginBottom: '1.5rem',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ background: '#ecf0f1', padding: '0.75rem 1rem', fontWeight: 600 }}>
+              Checkboxes de Segurança
+            </div>
+            <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={form.presencaEnxofre}
+                  onChange={(event) => setForm((prev) => ({ ...prev, presencaEnxofre: event.target.checked }))}
+                />
+                Presença de enxofre ou substâncias sulfuradas
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={form.geradorCianetos}
+                  onChange={(event) => setForm((prev) => ({ ...prev, geradorCianetos: event.target.checked }))}
+                />
+                Gerador de cianetos
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={form.aminas}
+                  onChange={(event) => setForm((prev) => ({ ...prev, aminas: event.target.checked }))}
+                />
+                Aminas
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" disabled={saving} className="button button-primary">
+            {saving ? 'Processando...' : '🏷️ Cadastrar e Gerar Etiqueta PDF'}
+          </button>
+
+          {message && (
+            <div className={message.includes('sucesso') ? 'success-message' : 'error-message'}>
+              {message}
+            </div>
+          )}
+        </form>
       </main>
     </div>
   );

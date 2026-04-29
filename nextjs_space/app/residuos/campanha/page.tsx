@@ -5,20 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 type UserInfo = {
   id: string;
@@ -66,6 +52,7 @@ export default function CampanhaResiduosPage() {
   const [loadingRows, setLoadingRows] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [message, setMessage] = useState('');
 
   const [residuos, setResiduos] = useState<Residuo[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<string[]>([]);
@@ -89,8 +76,8 @@ export default function CampanhaResiduosPage() {
         const data = await response.json();
         setUser(data);
         setResponsavelInformacoes(data?.name || data?.email || '');
-      } catch (error: any) {
-        toast.error(error?.message || 'Erro ao carregar usuário');
+      } catch (error) {
+        console.error('Erro ao carregar usuário:', error);
       } finally {
         setLoadingUser(false);
       }
@@ -111,8 +98,8 @@ export default function CampanhaResiduosPage() {
       if (data.length > 0) {
         setDepartamento((prev) => prev || data[0]?.departamento || '');
       }
-    } catch (error: any) {
-      toast.error(error?.message || 'Erro ao listar resíduos');
+    } catch (error) {
+      console.error('Erro ao listar resíduos:', error);
     } finally {
       setLoadingRows(false);
     }
@@ -143,8 +130,10 @@ export default function CampanhaResiduosPage() {
   };
 
   const processarCampanha = async () => {
+    setMessage('');
+
     if (selectedOrder.length === 0) {
-      toast.error('Selecione ao menos um frasco para a campanha.');
+      setMessage('Selecione ao menos um frasco para a campanha.');
       return;
     }
 
@@ -154,7 +143,7 @@ export default function CampanhaResiduosPage() {
     }));
 
     if (itens.some((item) => !Number.isFinite(item.volumeAtualLitros) || item.volumeAtualLitros < 0)) {
-      toast.error('Informe um volume atual válido (em L) para todos os frascos selecionados.');
+      setMessage('Informe um volume atual válido (em L) para todos os frascos selecionados.');
       return;
     }
 
@@ -181,7 +170,7 @@ export default function CampanhaResiduosPage() {
       downloadBase64(data.excelBase64, data.excelFileName, 'application/vnd.ms-excel');
       downloadBase64(data.etiquetasPdfBase64, data.etiquetasPdfFileName, 'application/pdf');
 
-      toast.success(
+      setMessage(
         `Campanha concluída: ${data.totalItens} frascos processados, planilha e etiquetas geradas, e itens removidos da base.`
       );
 
@@ -189,7 +178,7 @@ export default function CampanhaResiduosPage() {
       setVolumeAtual({});
       await loadResiduos();
     } catch (error: any) {
-      toast.error(error?.message || 'Erro ao processar campanha');
+      setMessage(error?.message || 'Erro ao processar campanha');
     } finally {
       setProcessing(false);
     }
@@ -213,6 +202,7 @@ export default function CampanhaResiduosPage() {
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/residuos">Resíduos</Link>
             <Link href="/residuos/cadastro">Cadastro</Link>
+            <Link href="/residuos/campanha">Campanha</Link>
           </nav>
           <div className="user-menu">
             <span>{user?.name || user?.email}</span>
@@ -221,119 +211,168 @@ export default function CampanhaResiduosPage() {
         </div>
       </header>
 
-      <main className="container space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="page-title !mb-0">Campanha de Recolhimento</h2>
-          <Link href="/residuos/cadastro"><Button>Ir para cadastro</Button></Link>
+      <main className="container">
+        <h2 className="page-title">Campanha de Recolhimento</h2>
+
+        <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', borderBottom: '2px solid #e0e0e0' }}>
+          <Link href="/residuos/cadastro">
+            <button
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'transparent',
+                color: '#333',
+                border: 'none',
+                cursor: 'pointer',
+                borderRadius: '4px 4px 0 0',
+              }}
+            >
+              Cadastro
+            </button>
+          </Link>
+          <Link href="/residuos/campanha">
+            <button
+              style={{
+                padding: '0.75rem 1rem',
+                background: '#3498db',
+                color: 'white',
+                border: 'none',
+                cursor: 'pointer',
+                borderRadius: '4px 4px 0 0',
+              }}
+            >
+              Campanha
+            </button>
+          </Link>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Dados da campanha</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="departamento">Departamento</Label>
-              <Input
-                id="departamento"
-                value={departamento}
-                onChange={(event) => setDepartamento(event.target.value)}
-              />
-            </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '1rem',
+            marginBottom: '1.5rem',
+            padding: '1rem',
+            backgroundColor: '#ecf0f1',
+            borderRadius: '4px',
+          }}
+        >
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Departamento</label>
+            <input
+              type="text"
+              value={departamento}
+              onChange={(event) => setDepartamento(event.target.value)}
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="responsavelInfo">Responsável pelas informações</Label>
-              <Input
-                id="responsavelInfo"
-                value={responsavelInformacoes}
-                onChange={(event) => setResponsavelInformacoes(event.target.value)}
-              />
-            </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Responsável pelas informações</label>
+            <input
+              type="text"
+              value={responsavelInformacoes}
+              onChange={(event) => setResponsavelInformacoes(event.target.value)}
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="dataCampanha">Data</Label>
-              <Input
-                id="dataCampanha"
-                type="date"
-                value={dataCampanha}
-                onChange={(event) => setDataCampanha(event.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Data</label>
+            <input
+              type="date"
+              value={dataCampanha}
+              onChange={(event) => setDataCampanha(event.target.value)}
+            />
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Frascos disponíveis para recolhimento</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingRows ? (
-              <p className="text-sm text-muted-foreground">Carregando frascos...</p>
-            ) : residuos.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Não há frascos cadastrados no momento.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Selecionar</TableHead>
-                    <TableHead>Ordinal</TableHead>
-                    <TableHead>Nº recipiente</TableHead>
-                    <TableHead>Composição</TableHead>
-                    <TableHead>Classe</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Tipo recipiente</TableHead>
-                    <TableHead>Volume atual (L)</TableHead>
-                    <TableHead>Volume recipiente (L)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {residuos.map((residuo) => {
-                    const selected = selectedOrder.includes(residuo.id);
-                    return (
-                      <TableRow key={residuo.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selected}
-                            onCheckedChange={(checked) => toggleSelection(residuo.id, Boolean(checked))}
-                          />
-                        </TableCell>
-                        <TableCell>{selected ? ordinalById[residuo.id] : '-'}</TableCell>
-                        <TableCell>{residuo.numeroRecipiente}</TableCell>
-                        <TableCell className="max-w-[360px] whitespace-normal">{residuo.composicao}</TableCell>
-                        <TableCell>{residuo.classe}</TableCell>
-                        <TableCell>{residuo.estado}</TableCell>
-                        <TableCell>{residuo.tipoRecipiente}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            disabled={!selected}
-                            value={volumeAtual[residuo.id] || ''}
-                            onChange={(event) =>
-                              setVolumeAtual((prev) => ({ ...prev, [residuo.id]: event.target.value }))
-                            }
-                            placeholder="0.00"
-                          />
-                        </TableCell>
-                        <TableCell>{residuo.volumeRecipienteLitros}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        {loadingRows ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>Carregando frascos...</div>
+        ) : residuos.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#7f8c8d' }}>
+            Não há frascos cadastrados no momento.
+          </div>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Selecionar</th>
+                <th>Ordinal</th>
+                <th>Nº Recipiente</th>
+                <th>Composição</th>
+                <th>Classe</th>
+                <th>Estado</th>
+                <th>Tipo Recipiente</th>
+                <th>Volume Atual (L)</th>
+                <th>Volume Recipiente (L)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {residuos.map((residuo) => {
+                const selected = selectedOrder.includes(residuo.id);
+                return (
+                  <tr key={residuo.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(event) => toggleSelection(residuo.id, event.target.checked)}
+                      />
+                    </td>
+                    <td>{selected ? ordinalById[residuo.id] : '-'}</td>
+                    <td>{residuo.numeroRecipiente}</td>
+                    <td style={{ maxWidth: '260px', whiteSpace: 'normal' }}>{residuo.composicao}</td>
+                    <td>{residuo.classe}</td>
+                    <td>{residuo.estado}</td>
+                    <td>{residuo.tipoRecipiente}</td>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        disabled={!selected}
+                        value={volumeAtual[residuo.id] || ''}
+                        onChange={(event) =>
+                          setVolumeAtual((prev) => ({ ...prev, [residuo.id]: event.target.value }))
+                        }
+                        placeholder="0.00"
+                        style={{
+                          width: '110px',
+                          padding: '0.5rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                        }}
+                      />
+                    </td>
+                    <td>{residuo.volumeRecipienteLitros}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
 
-        <div className="flex items-center gap-3">
-          <Button disabled={processing || selectedOrder.length === 0} onClick={processarCampanha}>
+        <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <button
+            disabled={processing || selectedOrder.length === 0}
+            onClick={processarCampanha}
+            className="button button-primary"
+          >
             {processing ? 'Processando...' : 'Gerar planilha + etiquetas e finalizar campanha'}
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            A numeração ordinal reinicia em 1 a cada campanha e será idêntica na planilha e nas etiquetas.
+          </button>
+          <p style={{ margin: 0, color: '#7f8c8d', fontSize: '0.95rem' }}>
+            A numeração ordinal reinicia em 1 a cada campanha.
           </p>
         </div>
+
+        {message && (
+          <div
+            className={
+              message.includes('concluída') || message.includes('geradas') ? 'success-message' : 'error-message'
+            }
+            style={{ marginTop: '0.75rem' }}
+          >
+            {message}
+          </div>
+        )}
       </main>
     </div>
   );

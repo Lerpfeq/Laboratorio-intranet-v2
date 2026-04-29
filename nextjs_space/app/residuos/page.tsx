@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 
 type UserInfo = {
   id: string;
@@ -43,6 +41,8 @@ export default function ResiduosPage() {
           const residuos = await residuosRes.json();
           setTotal(Array.isArray(residuos) ? residuos.length : 0);
         }
+      } catch (error) {
+        console.error('Erro ao carregar resíduos:', error);
       } finally {
         setLoading(false);
       }
@@ -80,44 +80,53 @@ export default function ResiduosPage() {
         </div>
       </header>
 
-      <main className="container space-y-6">
-        <h2 className="page-title !mb-0">Gestão de Resíduos</h2>
+      <main className="container">
+        <h2 className="page-title">Gestão de Resíduos</h2>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Total de frascos cadastrados: <strong>{total}</strong>
+        <div
+          style={{
+            marginBottom: '1.5rem',
+            padding: '1rem',
+            backgroundColor: '#ecf0f1',
+            borderRadius: '4px',
+          }}
+        >
+          <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>📦 Resumo</h3>
+          <p style={{ margin: 0, color: '#2c3e50' }}>
+            Total de frascos cadastrados: <strong>{total}</strong>
+          </p>
+        </div>
+
+        <div className="card-grid" style={{ marginBottom: 0 }}>
+          <div className="card card-blue" style={{ cursor: 'default' }}>
+            <div className="card-header">
+              <span className="card-icon">🧪</span>
+              <span>Cadastro de Frascos</span>
+            </div>
+            <p style={{ margin: 0, color: '#555' }}>
+              Registre novos frascos com composição detalhada e gere a etiqueta interna em PDF.
             </p>
-          </CardContent>
-        </Card>
+            <div>
+              <Link href="/residuos/cadastro">
+                <button className="button button-primary">Ir para cadastro</button>
+              </Link>
+            </div>
+          </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Cadastro de frascos</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Registre novos frascos com composição detalhada e gere a etiqueta interna em PDF.
-              </p>
-              <Link href="/residuos/cadastro"><Button>Ir para cadastro</Button></Link>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Campanha de recolhimento</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Selecione frascos, informe o volume atual e gere planilha + etiquetas da campanha.
-              </p>
-              <Link href="/residuos/campanha"><Button>Ir para campanha</Button></Link>
-            </CardContent>
-          </Card>
+          <div className="card card-purple" style={{ cursor: 'default' }}>
+            <div className="card-header">
+              <span className="card-icon">📋</span>
+              <span>Campanha de Recolhimento</span>
+            </div>
+            <p style={{ margin: 0, color: '#555' }}>
+              Selecione frascos, informe volume atual e gere planilha + etiquetas da campanha.
+            </p>
+            <div>
+              <Link href="/residuos/campanha">
+                <button className="button button-primary">Ir para campanha</button>
+              </Link>
+            </div>
+          </div>
         </div>
       </main>
     </div>
