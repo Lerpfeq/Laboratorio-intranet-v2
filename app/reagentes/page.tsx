@@ -444,7 +444,6 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div className="form-group">
-        <label>Category</label>
           <select
             value={formData.perigos}
              onChange={(e) => setFormData({ ...formData, perigos: e.target.value })}
