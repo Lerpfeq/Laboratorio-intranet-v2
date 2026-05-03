@@ -124,10 +124,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      planilha: planilhaBuffer.toString("base64"),
-      planilhaFilename: `planilha-campanha-${Date.now()}.xlsx`,
-      rotulos: rotulosBuffer.toString("base64"),
-      rotulosFilename: `rotulos-campanha-${Date.now()}.docx`,
+      planilhaBase64: planilhaBuffer.toString("base64"),
+      planilhaFileName: `planilha-campanha-${Date.now()}.xlsx`,
+      rotulosBase64: rotulosBuffer.toString("base64"),
+      rotulosFileName: `rotulos-campanha-${Date.now()}.docx`,
     });
   } catch (error: any) {
     console.error("POST /api/residuos/campanha error:", error);

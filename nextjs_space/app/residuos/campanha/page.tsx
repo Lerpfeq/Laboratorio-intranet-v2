@@ -168,14 +168,14 @@ export default function CampanhaResiduosPage() {
       }
 
       downloadBase64(
-        data.excelBase64,
-        data.excelFileName,
+        data.planilhaBase64,
+        data.planilhaFileName,
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       );
       downloadBase64(
-        data.rotulosBase64 || data.etiquetasPdfBase64,
-        data.rotulosFileName || data.etiquetasPdfFileName,
-        'application/pdf'
+        data.rotulosBase64,
+        data.rotulosFileName,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       );
 
       setMessage(
