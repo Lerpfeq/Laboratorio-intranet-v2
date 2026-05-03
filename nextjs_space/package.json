@@ -83,6 +83,7 @@
     "csv": "6.3.11",
     "date-fns": "3.6.0",
     "dayjs": "1.11.13",
+    "docx-templates": "^4.15.0",
     "docxtemplater": "^3.68.6",
     "dotenv": "16.5.0",
     "embla-carousel-react": "8.3.0",

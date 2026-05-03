@@ -86,47 +86,65 @@ export async function POST(request: NextRequest) {
 
     const byId = new Map(registros.map((r) => [r.id, r]));
 
-    const itemsWithOrdinal = payload.itens.map((item, index) => {
+    const selecionados = payload.itens.map((item) => {
       const residuo = byId.get(item.id);
       if (!residuo) {
         throw new Error(`Resíduo ${item.id} não encontrado`);
       }
 
       return {
-        ordinal: index + 1,
-        residuo: {
-          ...residuo,
-          volumeAtualLitros: item.volumeAtualLitros,
-        },
+        ...residuo,
+        volumeAtualLitros: item.volumeAtualLitros,
       };
     });
 
-    const excelBuffer = gerarPlanilhaCampanha({
-      residuos: itemsWithOrdinal,
+    const residuosComOrdinal = selecionados.map((r, idx) => ({
+      ...r,
+      numeroOrdinal: idx + 1,
+    }));
+
+    const metadados = {
       departamento: payload.departamento || registros[0]?.departamento,
-      responsavelInformacoes: payload.responsavelInformacoes || auth.user.name || auth.user.email || "Não informado",
+      responsavelInformacoes:
+        payload.responsavelInformacoes || auth.user.name || auth.user.email || "Não informado",
       data: payload.data ? new Date(payload.data) : new Date(),
-    });
+    };
 
-    const rotulosBuffer = await gerarRotulosCampanha(itemsWithOrdinal as any);
+    const planilhaBuffer = gerarPlanilhaCampanha(residuosComOrdinal as any, metadados);
+    const rotulosBuffer = await gerarRotulosCampanha(residuosComOrdinal as any);
 
-    await prisma.$transaction(async (tx) => {
-      for (const item of payload.itens) {
-        await tx.registroResiduo.delete({ where: { id: item.id } });
-      }
-    });
+    const now = Date.now();
+    const isDocx = rotulosBuffer.slice(0, 2).toString() === "PK";
+    const rotulosExt = isDocx ? "docx" : "pdf";
 
-    return NextResponse.json({
-      excelBase64: excelBuffer.toString("base64"),
-      excelFileName: `campanha-residuos-${Date.now()}.xlsx`,
-      rotulosBase64: rotulosBuffer.toString("base64"),
-      rotulosFileName: `rotulos-campanha-${Date.now()}.pdf`,
+    const response = NextResponse.json({
+      success: true,
+      planilha: planilhaBuffer.toString("base64"),
+      rotulos: rotulosBuffer.toString("base64"),
       // Compatibilidade com frontend atual
-      etiquetasPdfBase64: rotulosBuffer.toString("base64"),
-      etiquetasPdfFileName: `rotulos-campanha-${Date.now()}.pdf`,
+      excelBase64: planilhaBuffer.toString("base64"),
+      excelFileName: `campanha-residuos-${now}.xlsx`,
+      rotulosBase64: rotulosBuffer.toString("base64"),
+      rotulosFileName: `rotulos-campanha-${now}.${rotulosExt}`,
+      etiquetasPdfBase64: !isDocx ? rotulosBuffer.toString("base64") : undefined,
+      etiquetasPdfFileName: !isDocx ? `rotulos-campanha-${now}.pdf` : undefined,
       totalItens: payload.itens.length,
       excluidos: payload.itens.length,
     });
+
+    // Exclusão após montar resposta (fire-and-forget)
+    void prisma.registroResiduo
+      .deleteMany({
+        where: {
+          id: { in: payload.itens.map((item) => item.id) },
+          ...(auth.user.category === "Admin" ? {} : { usuarioId: auth.user.id }),
+        },
+      })
+      .catch((deleteError) => {
+        console.error("Falha ao excluir resíduos após campanha:", deleteError);
+      });
+
+    return response;
   } catch (error: any) {
     console.error("POST /api/residuos/campanha error:", error);
     return NextResponse.json(

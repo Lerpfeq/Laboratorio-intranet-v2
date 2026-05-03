@@ -154,12 +154,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const etiquetaPdf = await gerarEtiquetaInterna(residuo as any);
+    const pdfBuffer = await gerarEtiquetaInterna(residuo as any);
 
     return NextResponse.json(
       {
+        success: true,
         residuo,
-        etiquetaPdfBase64: etiquetaPdf.toString("base64"),
+        etiquetaPDF: pdfBuffer.toString("base64"),
+        // Compatibilidade com frontend atual
+        etiquetaPdfBase64: pdfBuffer.toString("base64"),
         etiquetaFileName: `etiqueta-residuo-${residuo.numeroRecipiente}.pdf`,
       },
       { status: 201 }
