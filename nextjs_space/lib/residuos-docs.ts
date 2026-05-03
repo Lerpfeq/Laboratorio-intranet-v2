@@ -26,18 +26,23 @@ type ResiduoDoc = {
   aminas: boolean;
 };
 
-const TEMPLATE_PLANILHA_PATH = path.join(
-  process.cwd(),
-  "templates",
-  "residuos",
-  "Planilha campanha.xlsx"
-);
-const TEMPLATE_ROTULO_PATH = path.join(
-  process.cwd(),
-  "templates",
-  "residuos",
-  "rotulo campanha.docx"
-);
+function resolveTemplatePath(fileName: string): string {
+  const customTemplateDir = process.env.RESIDUOS_TEMPLATE_DIR;
+
+  const candidatePaths = [
+    customTemplateDir ? path.resolve(customTemplateDir, fileName) : null,
+    path.resolve(process.cwd(), "templates", "residuos", fileName),
+    path.resolve(__dirname, "../templates/residuos", fileName),
+    path.resolve(__dirname, "../../templates/residuos", fileName),
+    path.resolve(__dirname, "../../../templates/residuos", fileName),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  const existingPath = candidatePaths.find((candidate) => fs.existsSync(candidate));
+  return existingPath ?? candidatePaths[0];
+}
+
+const TEMPLATE_PLANILHA_PATH = resolveTemplatePath("Planilha campanha.xlsx");
+const TEMPLATE_ROTULO_PATH = resolveTemplatePath("rotulo campanha.docx");
 
 function formatDatePtBr(date: Date): string {
   return new Intl.DateTimeFormat("pt-BR").format(date);
@@ -100,7 +105,7 @@ function drawLabel(
     });
   }
 
-  page.drawText("⚠", { x: width - 56, y: headerY - 4, size: 24, color: rgb(0.65, 0.1, 0.1) });
+  page.drawText("AVISO", { x: width - 90, y: headerY + 2, size: 12, color: rgb(0.65, 0.1, 0.1) });
 
   const contentX = margin + 12;
   let y = height - 96;
