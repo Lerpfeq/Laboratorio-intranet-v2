@@ -26,23 +26,39 @@ type ResiduoDoc = {
   aminas: boolean;
 };
 
-function resolveTemplatePath(fileName: string): string {
-  const customTemplateDir = process.env.RESIDUOS_TEMPLATE_DIR;
+const TEMPLATE_DIR = path.join(process.cwd(), "templates", "residuos");
+const PLANILHA_PATH = path.join(TEMPLATE_DIR, "Planilha campanha.xlsx");
+const ROTULO_PATH = path.join(TEMPLATE_DIR, "rotulo campanha.docx");
 
-  const candidatePaths = [
-    customTemplateDir ? path.resolve(customTemplateDir, fileName) : null,
-    path.resolve(process.cwd(), "templates", "residuos", fileName),
-    path.resolve(__dirname, "../templates/residuos", fileName),
-    path.resolve(__dirname, "../../templates/residuos", fileName),
-    path.resolve(__dirname, "../../../templates/residuos", fileName),
-  ].filter((candidate): candidate is string => Boolean(candidate));
+function getTemplatePath(filename: string): string {
+  const preferredPath =
+    filename === "Planilha campanha.xlsx"
+      ? PLANILHA_PATH
+      : filename === "rotulo campanha.docx"
+      ? ROTULO_PATH
+      : path.join(TEMPLATE_DIR, filename);
 
-  const existingPath = candidatePaths.find((candidate) => fs.existsSync(candidate));
-  return existingPath ?? candidatePaths[0];
+  const paths = [
+    preferredPath,
+    path.join(process.cwd(), "nextjs_space", "templates", "residuos", filename),
+    path.join(__dirname, "..", "..", "templates", "residuos", filename),
+    path.join(__dirname, "..", "templates", "residuos", filename),
+  ];
+
+  for (const p of paths) {
+    if (fs.existsSync(p)) {
+      console.info(`[residuos-docs] Template encontrado: ${filename} -> ${p}`);
+      return p;
+    }
+
+    console.warn(`[residuos-docs] Template nao encontrado neste caminho: ${p}`);
+  }
+
+  throw new Error(`Template nao encontrado: ${filename}. Buscado em: ${paths.join(", ")}`);
 }
 
-const TEMPLATE_PLANILHA_PATH = resolveTemplatePath("Planilha campanha.xlsx");
-const TEMPLATE_ROTULO_PATH = resolveTemplatePath("rotulo campanha.docx");
+const TEMPLATE_PLANILHA_PATH = getTemplatePath("Planilha campanha.xlsx");
+const TEMPLATE_ROTULO_PATH = getTemplatePath("rotulo campanha.docx");
 
 function formatDatePtBr(date: Date): string {
   return new Intl.DateTimeFormat("pt-BR").format(date);
