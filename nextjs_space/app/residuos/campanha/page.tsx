@@ -167,8 +167,16 @@ export default function CampanhaResiduosPage() {
         throw new Error(data?.error || 'Falha ao processar campanha');
       }
 
-      downloadBase64(data.excelBase64, data.excelFileName, 'application/vnd.ms-excel');
-      downloadBase64(data.etiquetasPdfBase64, data.etiquetasPdfFileName, 'application/pdf');
+      downloadBase64(
+        data.excelBase64,
+        data.excelFileName,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      downloadBase64(
+        data.rotulosBase64 || data.etiquetasPdfBase64,
+        data.rotulosFileName || data.etiquetasPdfFileName,
+        'application/pdf'
+      );
 
       setMessage(
         `Campanha concluída: ${data.totalItens} frascos processados, planilha e etiquetas geradas, e itens removidos da base.`

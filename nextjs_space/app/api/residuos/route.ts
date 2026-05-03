@@ -7,7 +7,7 @@ import {
   ESTADO_RESIDUO_VALUES,
   ResiduoPayload,
 } from "@/lib/residuos";
-import { generateEtiquetaResiduoPdf } from "@/lib/residuos-docs";
+import { gerarEtiquetaInterna } from "@/lib/residuos-docs";
 
 export const dynamic = "force-dynamic";
 
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const etiquetaPdf = await generateEtiquetaResiduoPdf(residuo as any, { watermark: "WASTE" });
+    const etiquetaPdf = await gerarEtiquetaInterna(residuo as any);
 
     return NextResponse.json(
       {

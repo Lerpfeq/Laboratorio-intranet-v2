@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import * as XLSX from "xlsx";
-import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
+import { PDFDocument, rgb, degrees, type PDFPage } from "pdf-lib";
 import { CLASSE_RESIDUO_LABEL } from "@/lib/residuos";
 
 type ResiduoDoc = {
@@ -26,18 +26,39 @@ type ResiduoDoc = {
   aminas: boolean;
 };
 
-const TEMPLATE_PLANILHA_PATH = path.join(process.cwd(), "templates", "residuos", "planilha-modelo.xls");
+const TEMPLATE_PLANILHA_PATH = path.join(
+  process.cwd(),
+  "templates",
+  "residuos",
+  "Planilha campanha.xlsx"
+);
+const TEMPLATE_ROTULO_PATH = path.join(
+  process.cwd(),
+  "templates",
+  "residuos",
+  "rotulo campanha.docx"
+);
 
 function formatDatePtBr(date: Date): string {
   return new Intl.DateTimeFormat("pt-BR").format(date);
 }
 
+function formatPercent(value?: number | null): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "0%";
+  return `${value}%`;
+}
+
 function drawLabel(
-  page: any,
+  page: PDFPage,
   residuo: ResiduoDoc,
-  options: { watermark?: string; ordinal?: number }
+  options: {
+    watermark?: string;
+    watermarkColor?: [number, number, number];
+    ordinal?: number;
+    showOrdinalCorner?: boolean;
+  }
 ) {
-  const { watermark, ordinal } = options;
+  const { watermark, ordinal, watermarkColor = [0.86, 0.86, 0.86], showOrdinalCorner = false } = options;
   const { width, height } = page.getSize();
   const margin = 24;
 
@@ -52,12 +73,12 @@ function drawLabel(
 
   if (watermark) {
     page.drawText(watermark, {
-      x: width / 2 - 120,
+      x: width / 2 - 132,
       y: height / 2 - 20,
-      size: 48,
-      color: rgb(0.86, 0.86, 0.86),
+      size: 52,
+      color: rgb(watermarkColor[0], watermarkColor[1], watermarkColor[2]),
       rotate: degrees(28),
-      opacity: 0.5,
+      opacity: 0.35,
     });
   }
 
@@ -69,6 +90,15 @@ function drawLabel(
     size: 9,
     color: rgb(0.25, 0.25, 0.25),
   });
+
+  if (showOrdinalCorner && ordinal) {
+    page.drawText(String(ordinal), {
+      x: width - margin - 28,
+      y: headerY + 4,
+      size: 16,
+      color: rgb(0.15, 0.15, 0.15),
+    });
+  }
 
   page.drawText("⚠", { x: width - 56, y: headerY - 4, size: 24, color: rgb(0.65, 0.1, 0.1) });
 
@@ -148,9 +178,9 @@ function drawLabel(
   });
 
   const compRows = [
-    ["Halogenados", `${residuo.halogenadosPercentual ?? 0}%`],
-    ["Acetonitrila", `${residuo.acetonitrilaPercentual ?? 0}%`],
-    ["Metais pesados", `${residuo.metaisPesadosPercentual ?? 0}%`],
+    ["Halogenados", formatPercent(residuo.halogenadosPercentual)],
+    ["Acetonitrila", formatPercent(residuo.acetonitrilaPercentual)],
+    ["Metais pesados", formatPercent(residuo.metaisPesadosPercentual)],
     ["Classe", CLASSE_RESIDUO_LABEL[residuo.classe]],
     ["Estado", residuo.estado === "S" ? "Sólido" : "Líquido"],
     ["Tipo de recipiente", residuo.tipoRecipiente],
@@ -181,29 +211,51 @@ function drawLabel(
 
 export async function generateEtiquetaResiduoPdf(
   residuo: ResiduoDoc,
-  options: { watermark?: string; ordinal?: number } = {}
+  options: {
+    watermark?: string;
+    watermarkColor?: [number, number, number];
+    ordinal?: number;
+    showOrdinalCorner?: boolean;
+  } = {}
 ): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([595, 842]);
-  await pdfDoc.embedFont(StandardFonts.Helvetica);
   drawLabel(page, residuo, options);
   const bytes = await pdfDoc.save();
   return Buffer.from(bytes);
+}
+
+export async function gerarEtiquetaInterna(residuo: ResiduoDoc): Promise<Buffer> {
+  return generateEtiquetaResiduoPdf(residuo, {
+    watermark: "RESÍDUO",
+    watermarkColor: [0.95, 0.75, 0.18],
+  });
 }
 
 export async function generateEtiquetasCampanhaPdf(
   residuos: Array<{ ordinal: number; residuo: ResiduoDoc }>
 ): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
-  await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   for (const item of residuos) {
     const page = pdfDoc.addPage([595, 842]);
-    drawLabel(page, item.residuo, { ordinal: item.ordinal });
+    drawLabel(page, item.residuo, {
+      ordinal: item.ordinal,
+      showOrdinalCorner: true,
+      watermark: "RESÍDUO",
+      watermarkColor: [0.95, 0.75, 0.18],
+    });
   }
 
   const bytes = await pdfDoc.save();
   return Buffer.from(bytes);
+}
+
+export async function gerarRotulosCampanha(
+  residuos: Array<{ ordinal: number; residuo: ResiduoDoc }>
+): Promise<Buffer> {
+  // Retorna PDF mantendo o layout de etiqueta interna com ordinais no canto superior direito.
+  return generateEtiquetasCampanhaPdf(residuos);
 }
 
 export function generateCampanhaExcel(params: {
@@ -218,44 +270,59 @@ export function generateCampanhaExcel(params: {
     cellStyles: true,
     cellDates: true,
   });
-  const sheetName = workbook.SheetNames[0] || "Plan1";
+  const sheetName = workbook.SheetNames[0] || "Planilha1";
   const ws = workbook.Sheets[sheetName];
 
   const campaignDate = data ?? new Date();
-  ws["A2"] = { t: "s", v: `Departamento: ${departamento || "DemBio"}` };
+  ws["A2"] = { ...ws["A2"], t: "s", v: `Departamento: ${departamento || "DemBio"}` };
   ws["A3"] = {
+    ...ws["A3"],
     t: "s",
     v: `Responsável pelas Informações: ${responsavelInformacoes || "Não informado"}`,
   };
-  ws["E3"] = { t: "s", v: `Data:${formatDatePtBr(campaignDate)}` };
+  ws["E3"] = { ...ws["E3"], t: "s", v: `Data: ${formatDatePtBr(campaignDate)}` };
 
   const startRow = 5;
   residuos.forEach((item, index) => {
     const row = startRow + index;
     const volumeAtual = item.residuo.volumeAtualLitros ?? 0;
 
-    ws[`A${row}`] = { t: "n", v: item.ordinal };
-    ws[`B${row}`] = { t: "s", v: item.residuo.composicao };
-    ws[`C${row}`] = { t: "s", v: CLASSE_RESIDUO_LABEL[item.residuo.classe] };
-    ws[`D${row}`] = { t: "s", v: item.residuo.estado };
-    ws[`E${row}`] = { t: "s", v: item.residuo.tipoRecipiente };
-    ws[`F${row}`] = { t: "s", v: `${volumeAtual}L` };
-    ws[`G${row}`] = { t: "s", v: `${item.residuo.volumeRecipienteLitros}L` };
+    ws[`A${row}`] = { ...ws[`A${row}`], t: "n", v: item.ordinal };
+    ws[`B${row}`] = { ...ws[`B${row}`], t: "s", v: item.residuo.composicao };
+    ws[`C${row}`] = { ...ws[`C${row}`], t: "s", v: CLASSE_RESIDUO_LABEL[item.residuo.classe] };
+    ws[`D${row}`] = { ...ws[`D${row}`], t: "s", v: item.residuo.estado };
+    ws[`E${row}`] = { ...ws[`E${row}`], t: "s", v: item.residuo.tipoRecipiente };
+    ws[`F${row}`] = { ...ws[`F${row}`], t: "n", v: volumeAtual };
+    ws[`G${row}`] = { ...ws[`G${row}`], t: "n", v: item.residuo.volumeRecipienteLitros };
   });
 
-  const maxRow = Math.max(startRow + residuos.length, 66);
+  const maxRow = Math.max(startRow + residuos.length, 17);
   ws["!ref"] = `A1:G${maxRow}`;
 
   const output = XLSX.write(workbook, {
     type: "buffer",
-    bookType: "xls",
+    bookType: "xlsx",
+    cellStyles: true,
   });
 
   return Buffer.isBuffer(output) ? output : Buffer.from(output);
 }
 
+export function gerarPlanilhaCampanha(params: {
+  residuos: Array<{ ordinal: number; residuo: ResiduoDoc }>;
+  departamento?: string;
+  responsavelInformacoes?: string;
+  data?: Date;
+}): Buffer {
+  return generateCampanhaExcel(params);
+}
+
 export function ensureTemplateExists() {
   if (!fs.existsSync(TEMPLATE_PLANILHA_PATH)) {
     throw new Error(`Template de planilha não encontrado em ${TEMPLATE_PLANILHA_PATH}`);
+  }
+
+  if (!fs.existsSync(TEMPLATE_ROTULO_PATH)) {
+    throw new Error(`Template de rótulo não encontrado em ${TEMPLATE_ROTULO_PATH}`);
   }
 }

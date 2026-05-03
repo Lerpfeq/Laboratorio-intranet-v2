@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { CampanhaPayload } from "@/lib/residuos";
 import {
   ensureTemplateExists,
-  generateCampanhaExcel,
-  generateEtiquetasCampanhaPdf,
+  gerarPlanilhaCampanha,
+  gerarRotulosCampanha,
 } from "@/lib/residuos-docs";
 
 export const dynamic = "force-dynamic";
@@ -101,14 +101,14 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const excelBuffer = generateCampanhaExcel({
+    const excelBuffer = gerarPlanilhaCampanha({
       residuos: itemsWithOrdinal,
       departamento: payload.departamento || registros[0]?.departamento,
       responsavelInformacoes: payload.responsavelInformacoes || auth.user.name || auth.user.email || "Não informado",
       data: payload.data ? new Date(payload.data) : new Date(),
     });
 
-    const etiquetasPdfBuffer = await generateEtiquetasCampanhaPdf(itemsWithOrdinal as any);
+    const rotulosBuffer = await gerarRotulosCampanha(itemsWithOrdinal as any);
 
     await prisma.$transaction(async (tx) => {
       for (const item of payload.itens) {
@@ -118,9 +118,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       excelBase64: excelBuffer.toString("base64"),
-      excelFileName: `campanha-residuos-${Date.now()}.xls`,
-      etiquetasPdfBase64: etiquetasPdfBuffer.toString("base64"),
-      etiquetasPdfFileName: `etiquetas-campanha-${Date.now()}.pdf`,
+      excelFileName: `campanha-residuos-${Date.now()}.xlsx`,
+      rotulosBase64: rotulosBuffer.toString("base64"),
+      rotulosFileName: `rotulos-campanha-${Date.now()}.pdf`,
+      // Compatibilidade com frontend atual
+      etiquetasPdfBase64: rotulosBuffer.toString("base64"),
+      etiquetasPdfFileName: `rotulos-campanha-${Date.now()}.pdf`,
       totalItens: payload.itens.length,
       excluidos: payload.itens.length,
     });
