@@ -161,9 +161,7 @@ export async function POST(request: NextRequest) {
         success: true,
         residuo,
         etiquetaPDF: pdfBuffer.toString("base64"),
-        // Compatibilidade com frontend atual
-        etiquetaPdfBase64: pdfBuffer.toString("base64"),
-        etiquetaFileName: `etiqueta-residuo-${residuo.numeroRecipiente}.pdf`,
+        filename: `etiqueta-residuo-${residuo.numeroRecipiente}.pdf`,
       },
       { status: 201 }
     );

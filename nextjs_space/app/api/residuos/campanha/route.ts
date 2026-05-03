@@ -103,48 +103,32 @@ export async function POST(request: NextRequest) {
       numeroOrdinal: idx + 1,
     }));
 
-    const metadados = {
-      departamento: payload.departamento || registros[0]?.departamento,
-      responsavelInformacoes:
-        payload.responsavelInformacoes || auth.user.name || auth.user.email || "Não informado",
-      data: payload.data ? new Date(payload.data) : new Date(),
-    };
+    const departamento = payload.departamento || registros[0]?.departamento || "";
+    const responsavel =
+      payload.responsavelInformacoes || auth.user.name || auth.user.email || "Não informado";
+    const data = payload.data ? new Date(payload.data).toISOString() : new Date().toISOString();
 
-    const planilhaBuffer = gerarPlanilhaCampanha(residuosComOrdinal as any, metadados);
+    const planilhaBuffer = await gerarPlanilhaCampanha(residuosComOrdinal as any, {
+      departamento,
+      responsavel,
+      data,
+    });
     const rotulosBuffer = await gerarRotulosCampanha(residuosComOrdinal as any);
 
-    const now = Date.now();
-    const isDocx = rotulosBuffer.slice(0, 2).toString() === "PK";
-    const rotulosExt = isDocx ? "docx" : "pdf";
-
-    const response = NextResponse.json({
-      success: true,
-      planilha: planilhaBuffer.toString("base64"),
-      rotulos: rotulosBuffer.toString("base64"),
-      // Compatibilidade com frontend atual
-      excelBase64: planilhaBuffer.toString("base64"),
-      excelFileName: `campanha-residuos-${now}.xlsx`,
-      rotulosBase64: rotulosBuffer.toString("base64"),
-      rotulosFileName: `rotulos-campanha-${now}.${rotulosExt}`,
-      etiquetasPdfBase64: !isDocx ? rotulosBuffer.toString("base64") : undefined,
-      etiquetasPdfFileName: !isDocx ? `rotulos-campanha-${now}.pdf` : undefined,
-      totalItens: payload.itens.length,
-      excluidos: payload.itens.length,
+    await prisma.registroResiduo.deleteMany({
+      where: {
+        id: { in: ids },
+        ...(auth.user.category === "Admin" ? {} : { usuarioId: auth.user.id }),
+      },
     });
 
-    // Exclusão após montar resposta (fire-and-forget)
-    void prisma.registroResiduo
-      .deleteMany({
-        where: {
-          id: { in: payload.itens.map((item) => item.id) },
-          ...(auth.user.category === "Admin" ? {} : { usuarioId: auth.user.id }),
-        },
-      })
-      .catch((deleteError) => {
-        console.error("Falha ao excluir resíduos após campanha:", deleteError);
-      });
-
-    return response;
+    return NextResponse.json({
+      success: true,
+      planilha: planilhaBuffer.toString("base64"),
+      planilhaFilename: `planilha-campanha-${Date.now()}.xlsx`,
+      rotulos: rotulosBuffer.toString("base64"),
+      rotulosFilename: `rotulos-campanha-${Date.now()}.docx`,
+    });
   } catch (error: any) {
     console.error("POST /api/residuos/campanha error:", error);
     return NextResponse.json(
