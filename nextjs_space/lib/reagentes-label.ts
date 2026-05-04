@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
 
 type ReagenteEtiquetaPayload = {
   nome: string;
@@ -19,6 +19,19 @@ function formatDate(value?: Date | string | null): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("pt-BR");
+}
+
+function isExpired(value?: Date | string | null): boolean {
+  if (!value) return false;
+
+  const validade = value instanceof Date ? new Date(value) : new Date(value);
+  if (Number.isNaN(validade.getTime())) return false;
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  validade.setHours(0, 0, 0, 0);
+
+  return validade < hoje;
 }
 
 export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): Promise<Buffer> {
@@ -91,6 +104,27 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
       color: rgb(0.2, 0.24, 0.3),
     });
     y -= 16;
+  }
+
+  if (isExpired(payload.dataValidade)) {
+    page.drawRectangle({
+      x: 16,
+      y: 16,
+      width: 388,
+      height: 238,
+      color: rgb(0.8, 0.8, 0.8),
+      opacity: 0.3,
+    });
+
+    page.drawText("EXPIRADO", {
+      x: 92,
+      y: 110,
+      size: 56,
+      font: fontBold,
+      color: rgb(0.82, 0.1, 0.1),
+      rotate: degrees(-35),
+      opacity: 0.7,
+    });
   }
 
   const pdfBytes = await pdfDoc.save();

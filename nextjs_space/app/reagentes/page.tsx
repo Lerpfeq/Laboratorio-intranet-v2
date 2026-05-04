@@ -15,9 +15,11 @@ interface Reagent {
   localidade: string | null;
   status: string;
   entradas: {
+    id: string;
     codigoInterno: string;
     dataValidade: string | null;
     localizacao: string | null;
+    dataEntrada?: string;
   }[];
 }
 
@@ -568,13 +570,21 @@ function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagent[]; onSuccess: 
   const [message, setMessage] = useState('');
   const [codigoInterno, setCodigoInterno] = useState('');
 
-  const reagentesComCodigo = reagentes.filter((r) => r.entradas?.[0]?.codigoInterno);
+  const entradasComCodigo = reagentes.flatMap((reagente) =>
+    (reagente.entradas || [])
+      .filter((entrada) => !!entrada.codigoInterno)
+      .map((entrada) => ({
+        reagenteId: reagente.id,
+        nome: reagente.nome,
+        codigoInterno: entrada.codigoInterno,
+      }))
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const reagenteSelecionado = reagentesComCodigo.find(
-      (r) => r.entradas[0]?.codigoInterno === codigoInterno
+    const reagenteSelecionado = entradasComCodigo.find(
+      (entrada) => entrada.codigoInterno === codigoInterno
     );
 
     if (!reagenteSelecionado) {
@@ -625,14 +635,11 @@ function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagent[]; onSuccess: 
           required
         >
           <option value="">Select internal code</option>
-          {reagentesComCodigo.map((r) => {
-            const ultimaEntrada = r.entradas[0];
-            return (
-              <option key={r.id} value={ultimaEntrada.codigoInterno}>
-                {ultimaEntrada.codigoInterno} — {r.nome}
-              </option>
-            );
-          })}
+          {entradasComCodigo.map((entrada) => (
+            <option key={`${entrada.reagenteId}-${entrada.codigoInterno}`} value={entrada.codigoInterno}>
+              {entrada.codigoInterno} — {entrada.nome}
+            </option>
+          ))}
         </select>
       </div>
 

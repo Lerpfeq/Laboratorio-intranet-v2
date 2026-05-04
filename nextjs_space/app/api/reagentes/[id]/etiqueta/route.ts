@@ -22,27 +22,21 @@ export async function GET(
       return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
     }
 
-    const reagente = await prisma.reagente.findUnique({
+    // Reemissão deve usar um frasco específico (ReagenteEntrada), não o último da família
+    const entrada = await prisma.reagenteEntrada.findUnique({
       where: { id: params.id },
-      include: {
-        entradas: {
-          orderBy: { dataEntrada: "desc" },
-          take: 1,
-        },
-      },
+      include: { reagente: true },
     });
 
-    if (!reagente || reagente.entradas.length === 0) {
+    if (!entrada) {
       return NextResponse.json(
-        { error: "Reagente não encontrado" },
+        { error: "Frasco não encontrado" },
         { status: 404 }
       );
     }
 
-    const entrada = reagente.entradas[0];
-
     const pdfBuffer = await gerarEtiquetaReagente({
-      nome: reagente.nome,
+      nome: entrada.reagente.nome,
       codigoInterno: entrada.codigoInterno,
       categoria: entrada.categoria,
       concentracao: entrada.concentracao,

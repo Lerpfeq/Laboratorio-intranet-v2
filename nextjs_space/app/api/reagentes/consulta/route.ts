@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
 
     const where: any = {};
 
-    // Filtro por nome
     if (nome) {
       where.nome = {
         contains: nome,
@@ -27,7 +26,6 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // Filtro por marca
     if (marca) {
       where.marca = {
         contains: marca,
@@ -35,12 +33,12 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // Filtro por status
     if (status) {
       where.status = status;
     }
 
-    const reagentes = await prisma.reagente.findMany({
+    // Inventário precisa listar cada frasco individualmente (uma linha por ReagenteEntrada)
+    const reagentesBase = await prisma.reagente.findMany({
       where,
       select: {
         id: true,
@@ -63,10 +61,39 @@ export async function GET(request: NextRequest) {
             responsavel: true,
           },
           orderBy: { dataEntrada: "desc" },
-          take: 1,
         },
       },
       orderBy: { nome: "asc" },
+    });
+
+    const reagentes = reagentesBase.flatMap((reagente) => {
+      if (reagente.entradas.length === 0) {
+        return [
+          {
+            id: reagente.id,
+            reagenteId: reagente.id,
+            nome: reagente.nome,
+            marca: reagente.marca,
+            volume: reagente.volume,
+            localidade: reagente.localidade,
+            status: reagente.status,
+            ultimaAtualizacao: reagente.ultimaAtualizacao,
+            entradas: [],
+          },
+        ];
+      }
+
+      return reagente.entradas.map((entrada) => ({
+        id: entrada.id,
+        reagenteId: reagente.id,
+        nome: reagente.nome,
+        marca: reagente.marca,
+        volume: reagente.volume,
+        localidade: reagente.localidade,
+        status: reagente.status,
+        ultimaAtualizacao: reagente.ultimaAtualizacao,
+        entradas: [entrada],
+      }));
     });
 
     return NextResponse.json(reagentes);

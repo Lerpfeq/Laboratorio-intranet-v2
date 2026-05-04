@@ -46,12 +46,13 @@ export async function GET(request: NextRequest) {
         ultimaAtualizacao: true,
         entradas: {
           select: {
+            id: true,
             codigoInterno: true,
             dataValidade: true,
             localizacao: true,
+            dataEntrada: true,
           },
           orderBy: { dataEntrada: "desc" },
-          take: 1,
         },
       },
       orderBy: { nome: "asc" },
