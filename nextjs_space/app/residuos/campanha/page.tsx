@@ -175,7 +175,7 @@ export default function CampanhaResiduosPage() {
       downloadBase64(
         data.rotulosBase64,
         data.rotulosFileName,
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       );
 
       setMessage(

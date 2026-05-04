@@ -2,6 +2,20 @@ import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
 import * as XLSX from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
+import {
+  AlignmentType,
+  BorderStyle,
+  Document,
+  Packer,
+  PageBreak,
+  Paragraph,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  VerticalAlign,
+  WidthType,
+} from "docx";
 
 // Dependência xlsx-style instalada para compatibilidade com ambientes legados.
 
@@ -407,201 +421,390 @@ export async function gerarPlanilhaCampanha(
   return Buffer.from(outputBuffer);
 }
 
-const LABORATORIO_PADRAO = "Laboratório de Engenharia de Reações Poliméricas - LERP / Prof. Dr. Roniérik Pioli Vieira";
+export async function gerarRotulosCampanha(residuos: any[]): Promise<Buffer> {
+  const sections: any[] = [];
 
-// Mapeamento exato (template A1:E18)
-const ROTULO_CELLS = {
-  departamento: "A3",
-  laboratorio: "A4",
-  responsavel: "A5",
-  origemResiduo: "A6",
-  dataPeriodo: "D3",
-  ph: "D6",
+  // Processar 2 rótulos por página
+  for (let i = 0; i < residuos.length; i += 2) {
+    const children: any[] = [];
 
-  halogenadosFlag: "B9",
-  acetonitrilaFlag: "B10",
-  metaisPesadosFlag: "B11",
-  enxofreFlag: "E9",
-  cianetoFlag: "E10",
-  aminasFlag: "E11",
+    // Rótulo 1
+    children.push(...criarRotulo(residuos[i]));
 
-  composicaoHalogenadosNome: "A13",
-  composicaoAcetonitrilaNome: "A14",
-  composicaoMetaisNome: "A15",
-  composicaoExtraNome: "A16",
-  composicaoExtraNome2: "A17",
+    // Espaço entre rótulos
+    children.push(new Paragraph({ spacing: { before: 200, after: 200 } }));
 
-  composicaoHalogenadosPct: "D13",
-  composicaoAcetonitrilaPct: "D14",
-  composicaoMetaisPct: "D15",
-} as const;
+    // Linha divisória pontilhada
+    children.push(
+      new Paragraph({
+        border: {
+          top: { style: BorderStyle.DASH_SMALL_GAP, size: 6, color: "999999" },
+        },
+        spacing: { before: 100, after: 100 },
+      })
+    );
 
-function deepClone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value));
-}
+    children.push(new Paragraph({ spacing: { before: 200, after: 200 } }));
 
-function withRowOffset(address: string, rowOffset: number): string {
-  const decoded = XLSX.utils.decode_cell(address);
-  return XLSX.utils.encode_cell({ r: decoded.r + rowOffset, c: decoded.c });
-}
-
-function copyTemplateSection(
-  targetWs: XLSX.WorkSheet,
-  templateWs: XLSX.WorkSheet,
-  rowOffset: number,
-  templateRange: XLSX.Range
-): void {
-  const templateRows = (templateWs["!rows"] || []) as any[];
-  const targetRows = ((targetWs["!rows"] as any[]) || []) as any[];
-
-  for (let r = templateRange.s.r; r <= templateRange.e.r; r += 1) {
-    for (let c = templateRange.s.c; c <= templateRange.e.c; c += 1) {
-      const sourceRef = XLSX.utils.encode_cell({ r, c });
-      const targetRef = XLSX.utils.encode_cell({ r: r + rowOffset, c });
-      const sourceCell = templateWs[sourceRef] as (XLSX.CellObject & { s?: any }) | undefined;
-      if (!sourceCell) continue;
-      targetWs[targetRef] = deepClone(sourceCell);
-    }
-
-    if (templateRows[r]) {
-      targetRows[r + rowOffset] = deepClone(templateRows[r]);
-    }
-  }
-
-  targetWs["!rows"] = targetRows;
-
-  const templateMerges = (templateWs["!merges"] || []) as XLSX.Range[];
-  const targetMerges = ((targetWs["!merges"] as XLSX.Range[]) || []) as XLSX.Range[];
-  templateMerges.forEach((mergeRange) => {
-    targetMerges.push({
-      s: { r: mergeRange.s.r + rowOffset, c: mergeRange.s.c },
-      e: { r: mergeRange.e.r + rowOffset, c: mergeRange.e.c },
-    });
-  });
-  targetWs["!merges"] = targetMerges;
-}
-
-function setCellText(targetWs: XLSX.WorkSheet, address: string, value: string, rowOffset = 0): void {
-  const cellRef = withRowOffset(address, rowOffset);
-  const current = (targetWs[cellRef] as (XLSX.CellObject & { s?: any }) | undefined) || {};
-  targetWs[cellRef] = {
-    ...current,
-    t: "s",
-    v: value,
-  };
-}
-
-function formatPercent(value: unknown): string {
-  const numeric = asNumber(value);
-  if (numeric === null) return "0%";
-  return `${numeric}%`;
-}
-
-function asSimNao(value: unknown): string {
-  return Boolean(value) ? "SIM" : "NÃO";
-}
-
-function asSimNaoFromPercent(value: unknown): string {
-  const numeric = asNumber(value);
-  return numeric !== null && numeric > 0 ? "SIM" : "NÃO";
-}
-
-function preencherCamposRotulo(targetWs: XLSX.WorkSheet, residuo: ResiduoDoc, rowOffset: number): void {
-  const dataFormatada = residuo.data ? formatDatePtBR(residuo.data) : "-";
-  const origem = asText(residuo.composicao);
-
-  const composicaoPartes = String(residuo.composicao || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  setCellText(targetWs, ROTULO_CELLS.departamento, `Departamento: ${asText(residuo.departamento)}`, rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.laboratorio, `Laboratório: ${LABORATORIO_PADRAO}`, rowOffset);
-  setCellText(
-    targetWs,
-    ROTULO_CELLS.responsavel,
-    `Responsável pelas informações: ${asText(residuo.responsavel)}`,
-    rowOffset
-  );
-  setCellText(targetWs, ROTULO_CELLS.origemResiduo, `Resíduo gerado na análise de: ${origem}`, rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.dataPeriodo, `Data ou período: ${dataFormatada}`, rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.ph, `pH= ${residuo.ph ?? "-"}`, rowOffset);
-
-  setCellText(targetWs, ROTULO_CELLS.halogenadosFlag, asSimNaoFromPercent(residuo.halogenadosPercentual ?? residuo.halogenados), rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.acetonitrilaFlag, asSimNaoFromPercent(residuo.acetonitrilaPercentual ?? residuo.acetonitrila), rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.metaisPesadosFlag, asSimNaoFromPercent(residuo.metaisPesadosPercentual ?? residuo.metaisPesados), rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.enxofreFlag, asSimNao(residuo.presencaEnxofre ?? residuo.enxofre), rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.cianetoFlag, asSimNao(residuo.geradorCianetos ?? residuo.cianeto), rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.aminasFlag, asSimNao(residuo.aminas), rowOffset);
-
-  setCellText(targetWs, ROTULO_CELLS.composicaoHalogenadosNome, "HALOGENADOS", rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.composicaoAcetonitrilaNome, "ACETONITRILA", rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.composicaoMetaisNome, "METAIS PESADOS", rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.composicaoHalogenadosPct, formatPercent(residuo.halogenadosPercentual ?? residuo.halogenados), rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.composicaoAcetonitrilaPct, formatPercent(residuo.acetonitrilaPercentual ?? residuo.acetonitrila), rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.composicaoMetaisPct, formatPercent(residuo.metaisPesadosPercentual ?? residuo.metaisPesados), rowOffset);
-
-  setCellText(targetWs, ROTULO_CELLS.composicaoExtraNome, composicaoPartes[0] || "", rowOffset);
-  setCellText(targetWs, ROTULO_CELLS.composicaoExtraNome2, composicaoPartes.slice(1).join(", "), rowOffset);
-}
-
-export async function gerarRotulosCampanha(residuos: ResiduoDoc[]): Promise<Buffer> {
-  const templatePath = getTemplatePath("rotulo-campanha-template.xlsx");
-  const templateBuffer = fs.readFileSync(templatePath);
-
-  const templateWorkbook = XLSX.read(templateBuffer, {
-    type: "buffer",
-    cellStyles: true,
-    cellNF: true,
-    cellDates: true,
-  });
-
-  const templateWs = templateWorkbook.Sheets[templateWorkbook.SheetNames[0]] as XLSX.WorkSheet;
-  const templateRange = XLSX.utils.decode_range(templateWs["!ref"] || "A1:E18");
-
-  const outputWb = XLSX.utils.book_new();
-  const labelsPerSheet = 2;
-  const secondLabelOffset = 19;
-
-  for (let i = 0; i < residuos.length; i += labelsPerSheet) {
-    const ws = {} as XLSX.WorkSheet;
-
-    ws["!cols"] = deepClone((templateWs["!cols"] || []) as any[]);
-
-    if (residuos[i]) {
-      copyTemplateSection(ws, templateWs, 0, templateRange);
-      preencherCamposRotulo(ws, residuos[i], 0);
-    }
-
+    // Rótulo 2 (se existir)
     if (residuos[i + 1]) {
-      copyTemplateSection(ws, templateWs, secondLabelOffset, templateRange);
-      preencherCamposRotulo(ws, residuos[i + 1], secondLabelOffset);
+      children.push(...criarRotulo(residuos[i + 1]));
     }
 
-    const maxRow = residuos[i + 1] ? 37 : 18;
-    ws["!ref"] = `A1:E${maxRow}`;
-
-    if (templateWs["!margins"]) {
-      ws["!margins"] = deepClone(templateWs["!margins"]);
+    // Quebra de página após cada par de rótulos (exceto no último)
+    if (i + 2 < residuos.length) {
+      children.push(new Paragraph({ children: [new PageBreak()] }));
     }
 
-    ws["!pageSetup"] = {
-      ...(deepClone((templateWs["!pageSetup"] || {}) as any) || {}),
-      paperSize: 9,
-      orientation: "portrait",
-      fitToWidth: 1,
-      fitToHeight: 0,
-      scale: 100,
-    } as any;
-
-    XLSX.utils.book_append_sheet(outputWb, ws, `Folha ${Math.floor(i / labelsPerSheet) + 1}`);
+    sections.push({
+      properties: {
+        page: {
+          size: { width: 11906, height: 16838 }, // A4
+          margin: { top: 720, right: 720, bottom: 720, left: 720 }, // 1.27cm
+        },
+      },
+      children,
+    });
   }
 
-  const outputBuffer = XLSX.write(outputWb as any, {
-    type: "buffer",
-    bookType: "xlsx",
-    cellStyles: true,
-  });
+  const doc = new Document({ sections });
+  return await Packer.toBuffer(doc);
+}
 
-  return Buffer.from(outputBuffer);
+function criarRotulo(residuo: any): any[] {
+  const elements: any[] = [];
+
+  // Cabeçalho com número no canto direito
+  elements.push(
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 15, color: "000000" },
+        bottom: { style: BorderStyle.SINGLE, size: 15, color: "000000" },
+        left: { style: BorderStyle.SINGLE, size: 15, color: "000000" },
+        right: { style: BorderStyle.SINGLE, size: 15, color: "000000" },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" },
+        insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" },
+      },
+      rows: [
+        // Linha 1: Título + Número
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: "RESÍDUO QUÍMICO",
+                      bold: true,
+                      size: 28,
+                    }),
+                  ],
+                }),
+              ],
+              width: { size: 70, type: WidthType.PERCENTAGE },
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: String(residuo.numeroOrdinal || ""),
+                      bold: true,
+                      size: 48,
+                      color: "FF0000",
+                    }),
+                  ],
+                  alignment: AlignmentType.RIGHT,
+                }),
+              ],
+              width: { size: 30, type: WidthType.PERCENTAGE },
+              verticalAlign: VerticalAlign.CENTER,
+            }),
+          ],
+        }),
+
+        // Linha 2: Departamento
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Departamento: ", bold: true }),
+                    new TextRun({ text: residuo.departamento || "" }),
+                  ],
+                }),
+              ],
+              columnSpan: 2,
+            }),
+          ],
+        }),
+
+        // Linha 3: Laboratório/Responsável
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Laboratório/Responsável: ", bold: true }),
+                    new TextRun({ text: "LERP / Prof. Dr. Roniérik Pioli Vieira" }),
+                  ],
+                }),
+              ],
+              columnSpan: 2,
+            }),
+          ],
+        }),
+
+        // Linha 4: Responsável pelo preenchimento
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Responsável: ", bold: true }),
+                    new TextRun({ text: residuo.responsavel || "" }),
+                  ],
+                }),
+              ],
+              width: { size: 60, type: WidthType.PERCENTAGE },
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Data: ", bold: true }),
+                    new TextRun({
+                      text: residuo.data ? new Date(residuo.data).toLocaleDateString("pt-BR") : "",
+                    }),
+                  ],
+                }),
+              ],
+              width: { size: 40, type: WidthType.PERCENTAGE },
+            }),
+          ],
+        }),
+
+        // Linha 5: Composição
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Composição do Resíduo: ", bold: true }),
+                    new TextRun({ text: residuo.composicao || "" }),
+                  ],
+                }),
+              ],
+              columnSpan: 2,
+            }),
+          ],
+        }),
+
+        // Linha 6: Classe e Estado
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Classe: ", bold: true }),
+                    new TextRun({ text: residuo.classe || "" }),
+                  ],
+                }),
+              ],
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Estado: ", bold: true }),
+                    new TextRun({ text: residuo.estado || "" }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+
+        // Linha 7: pH e Recipiente
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "pH: ", bold: true }),
+                    new TextRun({ text: residuo.ph ? String(residuo.ph) : "" }),
+                  ],
+                }),
+              ],
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Recipiente: ", bold: true }),
+                    new TextRun({ text: residuo.tipoRecipiente || "" }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+
+        // Linha 8: Volumes
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Volume do resíduo (L): ", bold: true }),
+                    new TextRun({ text: String(residuo.volumeAtual || residuo.volume || "") }),
+                  ],
+                }),
+              ],
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Volume do recipiente (L): ", bold: true }),
+                    new TextRun({ text: String(residuo.volumeRecipiente || "") }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+
+        // Linha 9: Checklist - Título
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "CHECKLIST DE SEGURANÇA", bold: true, size: 22 }),
+                  ],
+                  alignment: AlignmentType.CENTER,
+                }),
+              ],
+              columnSpan: 2,
+              shading: { fill: "EEEEEE" },
+            }),
+          ],
+        }),
+
+        // Linha 10-12: Checkboxes
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Halogenados: " }),
+                    new TextRun({ text: residuo.halogenados ? "SIM ☑" : "NÃO ☐", bold: true }),
+                    new TextRun({ text: ` (${residuo.halogenados || 0}%)` }),
+                  ],
+                }),
+              ],
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Enxofre/Sulfurados: " }),
+                    new TextRun({ text: residuo.enxofre ? "SIM ☑" : "NÃO ☐", bold: true }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Acetonitrila: " }),
+                    new TextRun({ text: residuo.acetonitrila ? "SIM ☑" : "NÃO ☐", bold: true }),
+                    new TextRun({ text: ` (${residuo.acetonitrila || 0}%)` }),
+                  ],
+                }),
+              ],
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Cianetos: " }),
+                    new TextRun({ text: residuo.cianeto ? "SIM ☑" : "NÃO ☐", bold: true }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Metais Pesados: " }),
+                    new TextRun({ text: residuo.metaisPesados ? "SIM ☑" : "NÃO ☐", bold: true }),
+                    new TextRun({ text: ` (${residuo.metaisPesados || 0}%)` }),
+                  ],
+                }),
+              ],
+            }),
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "Aminas: " }),
+                    new TextRun({ text: residuo.aminas ? "SIM ☑" : "NÃO ☐", bold: true }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+
+        // Linha 13: Aviso
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: "ATENÇÃO: Utilize apenas 75% do volume do frasco",
+                      bold: true,
+                      color: "FF0000",
+                      size: 20,
+                    }),
+                  ],
+                  alignment: AlignmentType.CENTER,
+                }),
+              ],
+              columnSpan: 2,
+              shading: { fill: "FFEEEE" },
+            }),
+          ],
+        }),
+      ],
+    })
+  );
+
+  return elements;
 }
