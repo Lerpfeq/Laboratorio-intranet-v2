@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       planilhaBase64: planilhaBuffer.toString("base64"),
       planilhaFileName: `planilha-campanha-${Date.now()}.xlsx`,
       rotulosBase64: rotulosBuffer.toString("base64"),
-      rotulosFileName: `rotulos-campanha-${Date.now()}.pdf`,
+      rotulosFileName: `rotulos-campanha-${Date.now()}.xlsx`,
     });
   } catch (error: any) {
     console.error("POST /api/residuos/campanha error:", error);

@@ -1,7 +1,9 @@
-import { PDFDocument, PDFPage, PDFFont, rgb, StandardFonts, degrees } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
 import * as XLSX from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
+
+// Dependência xlsx-style instalada para compatibilidade com ambientes legados.
 
 type ResiduoDoc = {
   id?: string;
@@ -60,7 +62,7 @@ function getTemplatePath(filename: string): string {
 
 export function ensureTemplateExists(): void {
   getTemplatePath("Planilha campanha.xlsx");
-  getTemplatePath("rotulo campanha.docx");
+  getTemplatePath("rotulo-campanha-template.xlsx");
 }
 
 function formatDatePtBR(value: unknown): string {
@@ -405,160 +407,201 @@ export async function gerarPlanilhaCampanha(
   return Buffer.from(outputBuffer);
 }
 
-function toPdfSafeText(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  return String(value)
-    .replace(/⚠️|⚠/g, "")
-    .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
-    .trim();
+const LABORATORIO_PADRAO = "Laboratório de Engenharia de Reações Poliméricas - LERP / Prof. Dr. Roniérik Pioli Vieira";
+
+// Mapeamento exato (template A1:E18)
+const ROTULO_CELLS = {
+  departamento: "A3",
+  laboratorio: "A4",
+  responsavel: "A5",
+  origemResiduo: "A6",
+  dataPeriodo: "D3",
+  ph: "D6",
+
+  halogenadosFlag: "B9",
+  acetonitrilaFlag: "B10",
+  metaisPesadosFlag: "B11",
+  enxofreFlag: "E9",
+  cianetoFlag: "E10",
+  aminasFlag: "E11",
+
+  composicaoHalogenadosNome: "A13",
+  composicaoAcetonitrilaNome: "A14",
+  composicaoMetaisNome: "A15",
+  composicaoExtraNome: "A16",
+  composicaoExtraNome2: "A17",
+
+  composicaoHalogenadosPct: "D13",
+  composicaoAcetonitrilaPct: "D14",
+  composicaoMetaisPct: "D15",
+} as const;
+
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function withRowOffset(address: string, rowOffset: number): string {
+  const decoded = XLSX.utils.decode_cell(address);
+  return XLSX.utils.encode_cell({ r: decoded.r + rowOffset, c: decoded.c });
+}
+
+function copyTemplateSection(
+  targetWs: XLSX.WorkSheet,
+  templateWs: XLSX.WorkSheet,
+  rowOffset: number,
+  templateRange: XLSX.Range
+): void {
+  const templateRows = (templateWs["!rows"] || []) as any[];
+  const targetRows = ((targetWs["!rows"] as any[]) || []) as any[];
+
+  for (let r = templateRange.s.r; r <= templateRange.e.r; r += 1) {
+    for (let c = templateRange.s.c; c <= templateRange.e.c; c += 1) {
+      const sourceRef = XLSX.utils.encode_cell({ r, c });
+      const targetRef = XLSX.utils.encode_cell({ r: r + rowOffset, c });
+      const sourceCell = templateWs[sourceRef] as (XLSX.CellObject & { s?: any }) | undefined;
+      if (!sourceCell) continue;
+      targetWs[targetRef] = deepClone(sourceCell);
+    }
+
+    if (templateRows[r]) {
+      targetRows[r + rowOffset] = deepClone(templateRows[r]);
+    }
+  }
+
+  targetWs["!rows"] = targetRows;
+
+  const templateMerges = (templateWs["!merges"] || []) as XLSX.Range[];
+  const targetMerges = ((targetWs["!merges"] as XLSX.Range[]) || []) as XLSX.Range[];
+  templateMerges.forEach((mergeRange) => {
+    targetMerges.push({
+      s: { r: mergeRange.s.r + rowOffset, c: mergeRange.s.c },
+      e: { r: mergeRange.e.r + rowOffset, c: mergeRange.e.c },
+    });
+  });
+  targetWs["!merges"] = targetMerges;
+}
+
+function setCellText(targetWs: XLSX.WorkSheet, address: string, value: string, rowOffset = 0): void {
+  const cellRef = withRowOffset(address, rowOffset);
+  const current = (targetWs[cellRef] as (XLSX.CellObject & { s?: any }) | undefined) || {};
+  targetWs[cellRef] = {
+    ...current,
+    t: "s",
+    v: value,
+  };
+}
+
+function formatPercent(value: unknown): string {
+  const numeric = asNumber(value);
+  if (numeric === null) return "0%";
+  return `${numeric}%`;
+}
+
+function asSimNao(value: unknown): string {
+  return Boolean(value) ? "SIM" : "NÃO";
+}
+
+function asSimNaoFromPercent(value: unknown): string {
+  const numeric = asNumber(value);
+  return numeric !== null && numeric > 0 ? "SIM" : "NÃO";
+}
+
+function preencherCamposRotulo(targetWs: XLSX.WorkSheet, residuo: ResiduoDoc, rowOffset: number): void {
+  const dataFormatada = residuo.data ? formatDatePtBR(residuo.data) : "-";
+  const origem = asText(residuo.composicao);
+
+  const composicaoPartes = String(residuo.composicao || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  setCellText(targetWs, ROTULO_CELLS.departamento, `Departamento: ${asText(residuo.departamento)}`, rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.laboratorio, `Laboratório: ${LABORATORIO_PADRAO}`, rowOffset);
+  setCellText(
+    targetWs,
+    ROTULO_CELLS.responsavel,
+    `Responsável pelas informações: ${asText(residuo.responsavel)}`,
+    rowOffset
+  );
+  setCellText(targetWs, ROTULO_CELLS.origemResiduo, `Resíduo gerado na análise de: ${origem}`, rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.dataPeriodo, `Data ou período: ${dataFormatada}`, rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.ph, `pH= ${residuo.ph ?? "-"}`, rowOffset);
+
+  setCellText(targetWs, ROTULO_CELLS.halogenadosFlag, asSimNaoFromPercent(residuo.halogenadosPercentual ?? residuo.halogenados), rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.acetonitrilaFlag, asSimNaoFromPercent(residuo.acetonitrilaPercentual ?? residuo.acetonitrila), rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.metaisPesadosFlag, asSimNaoFromPercent(residuo.metaisPesadosPercentual ?? residuo.metaisPesados), rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.enxofreFlag, asSimNao(residuo.presencaEnxofre ?? residuo.enxofre), rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.cianetoFlag, asSimNao(residuo.geradorCianetos ?? residuo.cianeto), rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.aminasFlag, asSimNao(residuo.aminas), rowOffset);
+
+  setCellText(targetWs, ROTULO_CELLS.composicaoHalogenadosNome, "HALOGENADOS", rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.composicaoAcetonitrilaNome, "ACETONITRILA", rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.composicaoMetaisNome, "METAIS PESADOS", rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.composicaoHalogenadosPct, formatPercent(residuo.halogenadosPercentual ?? residuo.halogenados), rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.composicaoAcetonitrilaPct, formatPercent(residuo.acetonitrilaPercentual ?? residuo.acetonitrila), rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.composicaoMetaisPct, formatPercent(residuo.metaisPesadosPercentual ?? residuo.metaisPesados), rowOffset);
+
+  setCellText(targetWs, ROTULO_CELLS.composicaoExtraNome, composicaoPartes[0] || "", rowOffset);
+  setCellText(targetWs, ROTULO_CELLS.composicaoExtraNome2, composicaoPartes.slice(1).join(", "), rowOffset);
 }
 
 export async function gerarRotulosCampanha(residuos: ResiduoDoc[]): Promise<Buffer> {
-  const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const templatePath = getTemplatePath("rotulo-campanha-template.xlsx");
+  const templateBuffer = fs.readFileSync(templatePath);
 
-  for (let i = 0; i < residuos.length; i += 2) {
-    const page = pdfDoc.addPage([595, 842]); // A4
-    const { width, height } = page.getSize();
+  const templateWorkbook = XLSX.read(templateBuffer, {
+    type: "buffer",
+    cellStyles: true,
+    cellNF: true,
+    cellDates: true,
+  });
 
-    desenharRotulo(page, residuos[i], font, fontBold, 0, height / 2, width, height / 2);
+  const templateWs = templateWorkbook.Sheets[templateWorkbook.SheetNames[0]] as XLSX.WorkSheet;
+  const templateRange = XLSX.utils.decode_range(templateWs["!ref"] || "A1:E18");
+
+  const outputWb = XLSX.utils.book_new();
+  const labelsPerSheet = 2;
+  const secondLabelOffset = 19;
+
+  for (let i = 0; i < residuos.length; i += labelsPerSheet) {
+    const ws = {} as XLSX.WorkSheet;
+
+    ws["!cols"] = deepClone((templateWs["!cols"] || []) as any[]);
+
+    if (residuos[i]) {
+      copyTemplateSection(ws, templateWs, 0, templateRange);
+      preencherCamposRotulo(ws, residuos[i], 0);
+    }
 
     if (residuos[i + 1]) {
-      desenharRotulo(page, residuos[i + 1], font, fontBold, 0, 0, width, height / 2);
+      copyTemplateSection(ws, templateWs, secondLabelOffset, templateRange);
+      preencherCamposRotulo(ws, residuos[i + 1], secondLabelOffset);
     }
+
+    const maxRow = residuos[i + 1] ? 37 : 18;
+    ws["!ref"] = `A1:E${maxRow}`;
+
+    if (templateWs["!margins"]) {
+      ws["!margins"] = deepClone(templateWs["!margins"]);
+    }
+
+    ws["!pageSetup"] = {
+      ...(deepClone((templateWs["!pageSetup"] || {}) as any) || {}),
+      paperSize: 9,
+      orientation: "portrait",
+      fitToWidth: 1,
+      fitToHeight: 0,
+      scale: 100,
+    } as any;
+
+    XLSX.utils.book_append_sheet(outputWb, ws, `Folha ${Math.floor(i / labelsPerSheet) + 1}`);
   }
 
-  const pdfBytes = await pdfDoc.save();
-  return Buffer.from(pdfBytes);
-}
-
-function desenharRotulo(
-  page: PDFPage,
-  residuo: ResiduoDoc,
-  font: PDFFont,
-  fontBold: PDFFont,
-  x: number,
-  y: number,
-  w: number,
-  h: number
-): void {
-  const margin = 20;
-  const startX = x + margin;
-  const startY = y + h - margin;
-
-  const numeroOrdinal = String(residuo?.numeroOrdinal || "");
-  const volumeAtual =
-    asNumber(residuo?.volumeAtualLitros) ?? asNumber(residuo?.volumeAtual) ?? asNumber(residuo?.volume) ?? "";
-  const volumeRecipiente =
-    asNumber(residuo?.volumeRecipienteLitros) ?? asNumber(residuo?.volumeRecipiente) ?? "";
-  const halogenados = asNumber(residuo?.halogenadosPercentual ?? residuo?.halogenados) ?? 0;
-  const acetonitrila = asNumber(residuo?.acetonitrilaPercentual ?? residuo?.acetonitrila) ?? 0;
-  const metaisPesados = asNumber(residuo?.metaisPesadosPercentual ?? residuo?.metaisPesados) ?? 0;
-
-  page.drawRectangle({
-    x: x + 10,
-    y: y + 10,
-    width: w - 20,
-    height: h - 20,
-    borderWidth: 1,
-    borderColor: rgb(0.2, 0.2, 0.2),
+  const outputBuffer = XLSX.write(outputWb as any, {
+    type: "buffer",
+    bookType: "xlsx",
+    cellStyles: true,
   });
 
-  page.drawText(toPdfSafeText(numeroOrdinal), {
-    x: x + w - 80,
-    y: startY - 30,
-    size: 36,
-    font: fontBold,
-  });
-
-  page.drawText("RESÍDUO QUÍMICO", {
-    x: startX,
-    y: startY - 30,
-    size: 16,
-    font: fontBold,
-  });
-
-  let currentY = startY - 60;
-
-  const drawField = (label: string, value: string, fontSize = 9) => {
-    page.drawText(`${toPdfSafeText(label)}: ${toPdfSafeText(value) || "-"}`, {
-      x: startX,
-      y: currentY,
-      size: fontSize,
-      font,
-    });
-    currentY -= 15;
-  };
-
-  drawField("Laboratório/Responsável", toPdfSafeText(`LERP ${residuo?.responsavel ? `- ${residuo.responsavel}` : ""}`));
-  drawField("Departamento", toPdfSafeText(residuo?.departamento || ""));
-  drawField("Data", residuo?.data ? formatDatePtBR(residuo.data) : "");
-
-  currentY -= 5;
-  drawField("Composição do Resíduo", toPdfSafeText(residuo?.composicao || ""));
-
-  currentY -= 5;
-  page.drawText(
-    `Classe: ${toPdfSafeText(residuo?.classe || "-")} | Estado: ${toPdfSafeText(residuo?.estado || "-")}`,
-    {
-      x: startX,
-      y: currentY,
-      size: 9,
-      font,
-    }
-  );
-  currentY -= 15;
-
-  drawField("Recipiente de armazenamento", toPdfSafeText(residuo?.tipoRecipiente || ""));
-  drawField("Volume do resíduo (L)", String(volumeAtual));
-  drawField("Volume do recipiente (L)", String(volumeRecipiente));
-  drawField("pH", String(residuo?.ph ?? "-"));
-
-  currentY -= 5;
-
-  page.drawText("Checklist:", { x: startX, y: currentY, size: 9, font: fontBold });
-  currentY -= 12;
-
-  const checkbox = (label: string, val: boolean) => {
-    page.drawText(`${toPdfSafeText(label)}: ${val ? "SIM" : "NÃO"}`, {
-      x: startX,
-      y: currentY,
-      size: 8,
-      font,
-    });
-    currentY -= 12;
-  };
-
-  checkbox("Gerador de cianetos", Boolean(residuo?.geradorCianetos ?? residuo?.cianeto));
-  checkbox("Aminas", Boolean(residuo?.aminas));
-
-  currentY -= 5;
-
-  page.drawText("Composição (%):", { x: startX, y: currentY, size: 9, font: fontBold });
-  currentY -= 12;
-  page.drawText(`Halogenados: ${halogenados}%`, { x: startX, y: currentY, size: 8, font });
-  currentY -= 12;
-  page.drawText(`Acetonitrila: ${acetonitrila}%`, { x: startX, y: currentY, size: 8, font });
-  currentY -= 12;
-  page.drawText(`Metais Pesados: ${metaisPesados}%`, { x: startX, y: currentY, size: 8, font });
-
-  currentY = y + 25;
-  page.drawText("ATENÇÃO: Utilize apenas 75% do volume do frasco", {
-    x: startX,
-    y: currentY,
-    size: 8,
-    font: fontBold,
-    color: rgb(0.7, 0, 0),
-  });
-
-  if (y > 0) {
-    page.drawLine({
-      start: { x: x + 10, y: y },
-      end: { x: x + w - 10, y: y },
-      thickness: 1,
-      color: rgb(0.5, 0.5, 0.5),
-      dashArray: [3, 3],
-    });
-  }
+  return Buffer.from(outputBuffer);
 }
