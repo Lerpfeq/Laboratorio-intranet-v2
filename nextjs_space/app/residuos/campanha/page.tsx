@@ -172,11 +172,7 @@ export default function CampanhaResiduosPage() {
         data.planilhaFileName,
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       );
-      downloadBase64(
-        data.rotulosBase64,
-        data.rotulosFileName,
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      );
+      downloadBase64(data.rotulosBase64, data.rotulosFileName, 'application/pdf');
 
       setMessage(
         `Campanha concluída: ${data.totalItens} frascos processados, planilha e etiquetas geradas, e itens removidos da base.`

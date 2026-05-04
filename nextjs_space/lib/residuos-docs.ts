@@ -1,18 +1,5 @@
-import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
+import { PDFDocument, PDFPage, PDFFont, rgb, StandardFonts, degrees } from "pdf-lib";
 import * as XLSX from "xlsx";
-import {
-  AlignmentType,
-  BorderStyle,
-  Document,
-  Packer,
-  PageBreak,
-  Paragraph,
-  Table,
-  TableCell,
-  TableRow,
-  TextRun,
-  WidthType,
-} from "docx";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -295,37 +282,6 @@ function setCellValuePreservingStyle(
   };
 }
 
-function findCellByLabel(worksheet: XLSX.WorkSheet, labelRegex: RegExp): string | null {
-  const ref = worksheet["!ref"];
-  if (!ref) return null;
-
-  const range = XLSX.utils.decode_range(ref);
-  for (let row = range.s.r; row <= range.e.r; row++) {
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const address = XLSX.utils.encode_cell({ r: row, c: col });
-      const cell = worksheet[address] as XLSX.CellObject | undefined;
-      if (!cell?.v) continue;
-      const text = String(cell.v).trim();
-      if (labelRegex.test(text)) return address;
-    }
-  }
-
-  return null;
-}
-
-function writeMetadataNextToLabel(
-  worksheet: XLSX.WorkSheet,
-  labelRegex: RegExp,
-  value: string
-): void {
-  const labelAddress = findCellByLabel(worksheet, labelRegex);
-  if (!labelAddress || !value) return;
-
-  const { c, r } = XLSX.utils.decode_cell(labelAddress);
-  const valueAddress = XLSX.utils.encode_cell({ c: c + 1, r });
-  setCellValuePreservingStyle(worksheet, valueAddress, value, "s", valueAddress);
-}
-
 export async function gerarPlanilhaCampanha(
   residuos: ResiduoDoc[],
   metadados: MetadadosCampanha
@@ -344,12 +300,33 @@ export async function gerarPlanilhaCampanha(
   const worksheet = workbook.Sheets[sheetName];
 
   const departamento = metadados.departamento || "";
-  const responsavel = metadados.responsavelInformacoes || metadados.responsavel || "";
+  const responsavel = metadados.responsavel || metadados.responsavelInformacoes || "";
   const data = formatDatePtBR(metadados.data);
 
-  writeMetadataNextToLabel(worksheet, /departamento/i, departamento);
-  writeMetadataNextToLabel(worksheet, /respons[aá]vel/i, responsavel);
-  writeMetadataNextToLabel(worksheet, /data/i, data === "-" ? "" : data);
+  // O template possui células mescladas no cabeçalho (A1:G1, A2:G2, A3:D3, E3:G3).
+  // Para garantir preenchimento consistente, escrevemos diretamente nas células do rótulo.
+  setCellValuePreservingStyle(
+    worksheet,
+    "A1",
+    `Laboratório/ Responsável: Laboratório de Engenharia de Reações Poliméricas - LERP`,
+    "s",
+    "A1"
+  );
+  setCellValuePreservingStyle(
+    worksheet,
+    "A2",
+    `Departamento: ${departamento || "-"}`,
+    "s",
+    "A2"
+  );
+  setCellValuePreservingStyle(
+    worksheet,
+    "A3",
+    `Responsável pelas Informações: ${responsavel || "-"}`,
+    "s",
+    "A3"
+  );
+  setCellValuePreservingStyle(worksheet, "E3", `Data: ${data === "-" ? "-" : data}`, "s", "E3");
 
   const startRow = 5;
 
@@ -396,110 +373,160 @@ export async function gerarPlanilhaCampanha(
   return Buffer.from(outputBuffer);
 }
 
-function createLabelCell(residuo?: ResiduoDoc, defaultOrdinal = ""): TableCell {
-  if (!residuo) {
-    return new TableCell({
-      width: { size: 50, type: WidthType.PERCENTAGE },
-      children: [new Paragraph(" ")],
-      margins: { top: 220, right: 220, bottom: 220, left: 220 },
-      borders: {
-        top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-        bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-        left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-        right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-      },
-    });
-  }
-
-  const ordinal = String(residuo.numeroOrdinal || defaultOrdinal || "");
-  const composicao = residuo.composicao || "";
-  const classe = residuo.classe || "";
-  const estado = residuo.estado || "";
-  const ph = residuo.ph ?? "";
-  const volumeAtual =
-    asNumber(residuo.volumeAtualLitros) ?? asNumber(residuo.volumeAtual) ?? asNumber(residuo.volume) ?? "";
-
-  return new TableCell({
-    width: { size: 50, type: WidthType.PERCENTAGE },
-    margins: { top: 180, right: 180, bottom: 180, left: 180 },
-    borders: {
-      top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-      bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-      left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-      right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-    },
-    children: [
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 80 },
-        children: [new TextRun({ text: ordinal, bold: true, size: 44 })],
-      }),
-      new Paragraph({
-        spacing: { after: 60 },
-        children: [new TextRun({ text: "RESIDUO QUIMICO", bold: true, size: 28 })],
-      }),
-      new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: `Composição: ${composicao}` })] }),
-      new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: `Classe: ${classe}` })] }),
-      new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: `Estado: ${estado}` })] }),
-      new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: `pH: ${ph}` })] }),
-      new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: `Volume: ${volumeAtual} L` })] }),
-      new Paragraph({
-        spacing: { after: 40 },
-        children: [new TextRun({ text: `Responsável: ${residuo.responsavel || ""}` })],
-      }),
-      new Paragraph({
-        spacing: { after: 40 },
-        children: [new TextRun({ text: `Departamento: ${residuo.departamento || ""}` })],
-      }),
-      new Paragraph({
-        children: [new TextRun({ text: `Data: ${formatDatePtBR(residuo.data)}` })],
-      }),
-    ],
-  });
+function toPdfSafeText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/⚠️|⚠/g, "")
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+    .trim();
 }
 
 export async function gerarRotulosCampanha(residuos: ResiduoDoc[]): Promise<Buffer> {
-  // Mantém validação explícita do template obrigatório da campanha
-  const templatePath = getTemplatePath("rotulo campanha.docx");
-  fs.readFileSync(templatePath);
-
-  const children: Array<Table | Paragraph> = [];
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   for (let i = 0; i < residuos.length; i += 2) {
-    const r1 = residuos[i];
-    const r2 = residuos[i + 1];
+    const page = pdfDoc.addPage([595, 842]); // A4
+    const { width, height } = page.getSize();
 
-    children.push(
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [
-          new TableRow({
-            children: [
-              createLabelCell(r1, String(i + 1)),
-              createLabelCell(r2, String(i + 2)),
-            ],
-          }),
-        ],
-      })
-    );
+    desenharRotulo(page, residuos[i], font, fontBold, 0, height / 2, width, height / 2);
 
-    if (i + 2 < residuos.length) {
-      children.push(new Paragraph({ children: [new PageBreak()] }));
+    if (residuos[i + 1]) {
+      desenharRotulo(page, residuos[i + 1], font, fontBold, 0, 0, width, height / 2);
     }
   }
 
-  const doc = new Document({
-    sections: [
-      {
-        properties: {
-          page: {
-            margin: { top: 500, right: 500, bottom: 500, left: 500 },
-          },
-        },
-        children,
-      },
-    ],
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
+}
+
+function desenharRotulo(
+  page: PDFPage,
+  residuo: ResiduoDoc,
+  font: PDFFont,
+  fontBold: PDFFont,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): void {
+  const margin = 20;
+  const startX = x + margin;
+  const startY = y + h - margin;
+
+  const numeroOrdinal = String(residuo?.numeroOrdinal || "");
+  const volumeAtual =
+    asNumber(residuo?.volumeAtualLitros) ?? asNumber(residuo?.volumeAtual) ?? asNumber(residuo?.volume) ?? "";
+  const volumeRecipiente =
+    asNumber(residuo?.volumeRecipienteLitros) ?? asNumber(residuo?.volumeRecipiente) ?? "";
+  const halogenados = asNumber(residuo?.halogenadosPercentual ?? residuo?.halogenados) ?? 0;
+  const acetonitrila = asNumber(residuo?.acetonitrilaPercentual ?? residuo?.acetonitrila) ?? 0;
+  const metaisPesados = asNumber(residuo?.metaisPesadosPercentual ?? residuo?.metaisPesados) ?? 0;
+
+  page.drawRectangle({
+    x: x + 10,
+    y: y + 10,
+    width: w - 20,
+    height: h - 20,
+    borderWidth: 1,
+    borderColor: rgb(0.2, 0.2, 0.2),
   });
 
-  return Packer.toBuffer(doc);
+  page.drawText(toPdfSafeText(numeroOrdinal), {
+    x: x + w - 80,
+    y: startY - 30,
+    size: 36,
+    font: fontBold,
+  });
+
+  page.drawText("RESÍDUO QUÍMICO", {
+    x: startX,
+    y: startY - 30,
+    size: 16,
+    font: fontBold,
+  });
+
+  let currentY = startY - 60;
+
+  const drawField = (label: string, value: string, fontSize = 9) => {
+    page.drawText(`${toPdfSafeText(label)}: ${toPdfSafeText(value) || "-"}`, {
+      x: startX,
+      y: currentY,
+      size: fontSize,
+      font,
+    });
+    currentY -= 15;
+  };
+
+  drawField("Laboratório/Responsável", toPdfSafeText(`LERP ${residuo?.responsavel ? `- ${residuo.responsavel}` : ""}`));
+  drawField("Departamento", toPdfSafeText(residuo?.departamento || ""));
+  drawField("Data", residuo?.data ? formatDatePtBR(residuo.data) : "");
+
+  currentY -= 5;
+  drawField("Composição do Resíduo", toPdfSafeText(residuo?.composicao || ""));
+
+  currentY -= 5;
+  page.drawText(
+    `Classe: ${toPdfSafeText(residuo?.classe || "-")} | Estado: ${toPdfSafeText(residuo?.estado || "-")}`,
+    {
+      x: startX,
+      y: currentY,
+      size: 9,
+      font,
+    }
+  );
+  currentY -= 15;
+
+  drawField("Recipiente de armazenamento", toPdfSafeText(residuo?.tipoRecipiente || ""));
+  drawField("Volume do resíduo (L)", String(volumeAtual));
+  drawField("Volume do recipiente (L)", String(volumeRecipiente));
+  drawField("pH", String(residuo?.ph ?? "-"));
+
+  currentY -= 5;
+
+  page.drawText("Checklist:", { x: startX, y: currentY, size: 9, font: fontBold });
+  currentY -= 12;
+
+  const checkbox = (label: string, val: boolean) => {
+    page.drawText(`${toPdfSafeText(label)}: ${val ? "SIM" : "NÃO"}`, {
+      x: startX,
+      y: currentY,
+      size: 8,
+      font,
+    });
+    currentY -= 12;
+  };
+
+  checkbox("Gerador de cianetos", Boolean(residuo?.geradorCianetos ?? residuo?.cianeto));
+  checkbox("Aminas", Boolean(residuo?.aminas));
+
+  currentY -= 5;
+
+  page.drawText("Composição (%):", { x: startX, y: currentY, size: 9, font: fontBold });
+  currentY -= 12;
+  page.drawText(`Halogenados: ${halogenados}%`, { x: startX, y: currentY, size: 8, font });
+  currentY -= 12;
+  page.drawText(`Acetonitrila: ${acetonitrila}%`, { x: startX, y: currentY, size: 8, font });
+  currentY -= 12;
+  page.drawText(`Metais Pesados: ${metaisPesados}%`, { x: startX, y: currentY, size: 8, font });
+
+  currentY = y + 25;
+  page.drawText("ATENÇÃO: Utilize apenas 75% do volume do frasco", {
+    x: startX,
+    y: currentY,
+    size: 8,
+    font: fontBold,
+    color: rgb(0.7, 0, 0),
+  });
+
+  if (y > 0) {
+    page.drawLine({
+      start: { x: x + 10, y: y },
+      end: { x: x + w - 10, y: y },
+      thickness: 1,
+      color: rgb(0.5, 0.5, 0.5),
+      dashArray: [3, 3],
+    });
+  }
 }
