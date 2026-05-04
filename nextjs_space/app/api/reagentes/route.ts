@@ -95,59 +95,64 @@ export async function POST(request: NextRequest) {
       responsavel,
     } = body;
 
-    // Upsert the reagente
-    let reagente = await prisma.reagente.findFirst({ where: { nome } });
-    if (!reagente) {
-      reagente = await prisma.reagente.create({
-        data: { nome, marca, volume, localidade, status: "ok" },
-      });
-    } else {
-      reagente = await prisma.reagente.update({
-        where: { id: reagente.id },
-        data: { status: "ok", ultimaAtualizacao: new Date() },
-      });
-    }
+    const qty = Math.max(1, Number.parseInt(String(quantidade ?? 1), 10) || 1);
 
-    // Create one entrada per bottle (quantidade), each with its own unique code
-    const qty = Math.max(1, parseInt(quantidade) || 1);
-    const entradas = [];
-
-    for (let i = 0; i < qty; i++) {
-      // Keep regenerating until the code is unique in the DB
-      let codigoInterno: string;
-      let exists = true;
-      do {
-        codigoInterno = generateCodigoInterno(categoria);
-        const found = await prisma.reagenteEntrada.findFirst({
-          where: { codigoInterno },
+    const entradas = await prisma.$transaction(async (tx) => {
+      // Upsert the reagent once and create one inventory record per bottle
+      let reagente = await tx.reagente.findFirst({ where: { nome } });
+      if (!reagente) {
+        reagente = await tx.reagente.create({
+          data: { nome, marca, volume, localidade, status: "ok" },
         });
-        exists = !!found;
-      } while (exists);
+      } else {
+        reagente = await tx.reagente.update({
+          where: { id: reagente.id },
+          data: { status: "ok", ultimaAtualizacao: new Date() },
+        });
+      }
 
-      const entrada = await prisma.reagenteEntrada.create({
-        data: {
-          reagenteId: reagente.id,
-          usuarioId: session.user.id,
-          dataEntrada: new Date(dataEntrada),
-          fornecedor,
-          notaFiscal,
-          volume,
-          marca,
-          quantidade: 1, // each entry represents a single bottle
-          codigoInterno,
-          localizacao: localidade,
-          observacoes,
-          categoria,
-          concentracao,
-          dataValidade: dataValidade ? new Date(dataValidade) : null,
-          perigos,
-          responsavel: responsavel || user?.name || "Não informado",
-        },
-        include: { reagente: true },
-      });
+      const createdEntradas = [];
 
-      entradas.push(entrada);
-    }
+      for (let i = 0; i < qty; i++) {
+        // Keep regenerating until the code is unique in the DB
+        let codigoInterno: string;
+        let exists = true;
+
+        do {
+          codigoInterno = generateCodigoInterno(categoria);
+          const found = await tx.reagenteEntrada.findFirst({
+            where: { codigoInterno },
+          });
+          exists = !!found;
+        } while (exists);
+
+        const entrada = await tx.reagenteEntrada.create({
+          data: {
+            reagenteId: reagente.id,
+            usuarioId: session.user.id,
+            dataEntrada: new Date(dataEntrada),
+            fornecedor,
+            notaFiscal,
+            volume,
+            marca,
+            quantidade: 1, // each entry represents a single bottle
+            codigoInterno,
+            localizacao: localidade,
+            observacoes,
+            categoria,
+            concentracao,
+            dataValidade: dataValidade ? new Date(dataValidade) : null,
+            perigos,
+            responsavel: responsavel || user?.name || "Não informado",
+          },
+          include: { reagente: true },
+        });
+
+        createdEntradas.push(entrada);
+      }
+
+      return createdEntradas;
+    });
 
     // Return array (even for qty=1, always an array so the frontend handles it uniformly)
     return NextResponse.json(entradas, { status: 201 });

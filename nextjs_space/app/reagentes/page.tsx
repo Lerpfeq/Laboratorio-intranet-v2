@@ -115,7 +115,7 @@ export default function ReagentesPage() {
           </div>
         )}
 
-        {tab === 'consulta' && <ConsultaReagentes />}
+        {tab === 'consulta' && <ConsultaReagentes userCategory={user?.category} />}
         {tab === 'entrada' && (isPosGraduando || isAdmin) && <EntradaForm onSuccess={fetchUserAndReagentes} />}
         {tab === 'saida' && (isPosGraduando || isAdmin) && <SaidaForm reagentes={reagentes} onSuccess={fetchUserAndReagentes} />}
       </main>
@@ -123,14 +123,56 @@ export default function ReagentesPage() {
   );
 }
 
-function ConsultaReagentes() {
+function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
   const [reagentes, setReagentes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [filtros, setFiltros] = useState({ nome: '', marca: '' });
+  const [reemitindoId, setReemitindoId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchReagentes();
   }, []);
+
+  const downloadBase64 = (base64: string, fileName: string, mimeType: string) => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: mimeType });
+    const blobUrl = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
+  };
+
+  const reemitirEtiqueta = async (id: string, codigo: string) => {
+    try {
+      setReemitindoId(id);
+      const response = await fetch(`/api/reagentes/${id}/etiqueta`);
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        downloadBase64(data.etiquetaPdfBase64, data.etiquetaFileName, 'application/pdf');
+        alert(`Etiqueta ${codigo} reemitida com sucesso!`);
+      } else {
+        alert(`Erro ao gerar etiqueta: ${data.error || 'falha desconhecida'}`);
+      }
+    } catch (error) {
+      console.error('Erro ao reemitir etiqueta:', error);
+      alert('Erro ao reemitir etiqueta');
+    } finally {
+      setReemitindoId(null);
+    }
+  };
 
   const fetchReagentes = async (nome = '', marca = '') => {
     setLoading(true);
@@ -208,6 +250,7 @@ function ConsultaReagentes() {
               <th>Location</th>
               <th>Expiry Date</th>
               <th>Status</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -227,6 +270,26 @@ function ConsultaReagentes() {
                       : '-'}
                   </td>
                   <td><span className={`status-badge status-${r.status}`}>{r.status}</span></td>
+                  <td>
+                    <button
+                      onClick={() => reemitirEtiqueta(r.id, ultimaEntrada?.codigoInterno || '')}
+                      disabled={userCategory === 'IC' || !ultimaEntrada?.codigoInterno || reemitindoId === r.id}
+                      className="button"
+                      style={{
+                        padding: '0.45rem 0.75rem',
+                        backgroundColor: userCategory === 'IC' ? '#d5d8dc' : '#e8f4fd',
+                        color: userCategory === 'IC' ? '#7f8c8d' : '#2471a3',
+                        border: '1px solid #aed6f1',
+                        borderRadius: '4px',
+                        cursor: userCategory === 'IC' ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                      }}
+                      title={userCategory === 'IC' ? 'Perfil IC sem permissão para reemitir etiqueta' : 'Reemitir etiqueta PDF'}
+                    >
+                      {reemitindoId === r.id ? 'Gerando...' : '📄 Reemitir Etiqueta'}
+                    </button>
+                  </td>
                 </tr>
               );
             })}
