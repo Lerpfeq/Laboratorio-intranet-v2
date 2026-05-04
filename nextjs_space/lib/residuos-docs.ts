@@ -13,7 +13,6 @@ import {
   TableCell,
   TableRow,
   TextRun,
-  VerticalAlign,
   WidthType,
 } from "docx";
 
@@ -429,29 +428,17 @@ export async function gerarRotulosCampanha(residuos: any[]): Promise<Buffer> {
     const children: any[] = [];
 
     // Rótulo 1
-    children.push(...criarRotulo(residuos[i]));
+    children.push(criarRotuloTemplate(residuos[i]));
 
-    // Espaço entre rótulos
-    children.push(new Paragraph({ spacing: { before: 200, after: 200 } }));
-
-    // Linha divisória pontilhada
-    children.push(
-      new Paragraph({
-        border: {
-          top: { style: BorderStyle.DASH_SMALL_GAP, size: 6, color: "999999" },
-        },
-        spacing: { before: 100, after: 100 },
-      })
-    );
-
-    children.push(new Paragraph({ spacing: { before: 200, after: 200 } }));
+    // Espaço pequeno entre rótulos
+    children.push(new Paragraph({ spacing: { before: 100, after: 100 } }));
 
     // Rótulo 2 (se existir)
     if (residuos[i + 1]) {
-      children.push(...criarRotulo(residuos[i + 1]));
+      children.push(criarRotuloTemplate(residuos[i + 1]));
     }
 
-    // Quebra de página após cada par de rótulos (exceto no último)
+    // Quebra de página após cada par
     if (i + 2 < residuos.length) {
       children.push(new Paragraph({ children: [new PageBreak()] }));
     }
@@ -460,7 +447,7 @@ export async function gerarRotulosCampanha(residuos: any[]): Promise<Buffer> {
       properties: {
         page: {
           size: { width: 11906, height: 16838 }, // A4
-          margin: { top: 720, right: 720, bottom: 720, left: 720 }, // 1.27cm
+          margin: { top: 567, right: 567, bottom: 567, left: 567 }, // ~1cm
         },
       },
       children,
@@ -471,334 +458,503 @@ export async function gerarRotulosCampanha(residuos: any[]): Promise<Buffer> {
   return await Packer.toBuffer(doc);
 }
 
-function criarRotulo(residuo: any): any[] {
-  const elements: any[] = [];
+function toBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value > 0;
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  return ["true", "1", "sim", "yes", "y"].includes(normalized);
+}
 
-  // Cabeçalho com número no canto direito
-  elements.push(
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      borders: {
-        top: { style: BorderStyle.SINGLE, size: 15, color: "000000" },
-        bottom: { style: BorderStyle.SINGLE, size: 15, color: "000000" },
-        left: { style: BorderStyle.SINGLE, size: 15, color: "000000" },
-        right: { style: BorderStyle.SINGLE, size: 15, color: "000000" },
-        insideHorizontal: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" },
-        insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "CCCCCC" },
-      },
-      rows: [
-        // Linha 1: Título + Número
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: "RESÍDUO QUÍMICO",
-                      bold: true,
-                      size: 28,
-                    }),
-                  ],
-                }),
-              ],
-              width: { size: 70, type: WidthType.PERCENTAGE },
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: String(residuo.numeroOrdinal || ""),
-                      bold: true,
-                      size: 48,
-                      color: "FF0000",
-                    }),
-                  ],
-                  alignment: AlignmentType.RIGHT,
-                }),
-              ],
-              width: { size: 30, type: WidthType.PERCENTAGE },
-              verticalAlign: VerticalAlign.CENTER,
-            }),
-          ],
+function formatDateSafe(value: unknown): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("pt-BR");
+}
+
+function criarRotuloTemplate(residuo: any): Table {
+  const borderStyle = {
+    top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+    bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+    left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+    right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+  };
+
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: borderStyle.top,
+      bottom: borderStyle.bottom,
+      left: borderStyle.left,
+      right: borderStyle.right,
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+      insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+    },
+    rows: [
+      // Linha 1: Cabeçalho FEQ/UNICAMP
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "FEQ/UNICAMP", bold: true, size: 18 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+            columnSpan: 5,
+          }),
+        ],
+      }),
+
+      // Linha 2: Departamento
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Departamento:", bold: true, size: 18 })],
+              }),
+            ],
+            columnSpan: 5,
+          }),
+        ],
+      }),
+
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: residuo.departamento || "", size: 18 })],
+              }),
+            ],
+            columnSpan: 5,
+          }),
+        ],
+      }),
+
+      // Linha 3: Laboratório/Responsável
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "Laboratório/ Responsável:", bold: true, size: 18 }),
+                ],
+              }),
+            ],
+            columnSpan: 5,
+          }),
+        ],
+      }),
+
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "LERP / Prof. Dr. Roniérik Pioli Vieira", size: 18 })],
+              }),
+            ],
+            columnSpan: 5,
+          }),
+        ],
+      }),
+
+      // Linha 4: Responsável pelas informações
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Responsável pelas informações:", bold: true, size: 18 })],
+              }),
+            ],
+            columnSpan: 5,
+          }),
+        ],
+      }),
+
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: residuo.responsavel || "", size: 18 })],
+              }),
+            ],
+            columnSpan: 3,
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Data/Período:", bold: true, size: 16 })],
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: formatDateSafe(residuo.data), size: 16 })],
+              }),
+            ],
+          }),
+        ],
+      }),
+
+      // Linha 5: Origem do resíduo/Descrição da análise
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Origem do resíduo/Descrição da análise:",
+                    bold: true,
+                    size: 18,
+                  }),
+                ],
+              }),
+            ],
+            columnSpan: 5,
+          }),
+        ],
+      }),
+
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: residuo.composicao || "", size: 18 })],
+              }),
+            ],
+            columnSpan: 5,
+          }),
+        ],
+      }),
+
+      // Classe do resíduo
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Classe do Resíduo: (Ex.: Hidrocarbonetos-HC, Organoalogenados-OH, Compostos Nitrogenados-CN, Compostos Sulfurados-CS, Organofosforados-OF, Organometálicos-OM)",
+                    bold: true,
+                    size: 16,
+                  }),
+                ],
+              }),
+            ],
+            columnSpan: 3,
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Sólido (S) ou Líquido (L)", bold: true, size: 16 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+            columnSpan: 2,
+          }),
+        ],
+      }),
+
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: residuo.classe || "", size: 20, bold: true })],
+              }),
+            ],
+            columnSpan: 3,
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: residuo.estado || "", size: 20, bold: true })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+            columnSpan: 2,
+          }),
+        ],
+      }),
+
+      // Recipiente de armazenamento
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Recipiente de armazenamento (Ex.: bombona certificada, frasco de vidro, frasco plástico)",
+                    bold: true,
+                    size: 16,
+                  }),
+                ],
+              }),
+            ],
+            columnSpan: 2,
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Volume do resíduo (L)", bold: true, size: 16 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Volume do recipiente (L)", bold: true, size: 16 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "pH", bold: true, size: 16 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+        ],
+      }),
+
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: residuo.tipoRecipiente || "", size: 18 })],
+              }),
+            ],
+            columnSpan: 2,
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: String(residuo.volumeAtual ?? residuo.volume ?? ""), size: 18 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: String(residuo.volumeRecipiente ?? ""), size: 18 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: String(residuo.ph ?? ""), size: 18 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+        ],
+      }),
+
+      // Checkboxes - Preenchimento Obrigatório
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "Preenchimento Obrigatório (Assinale SIM ou NÃO)",
+                    bold: true,
+                    size: 16,
+                  }),
+                ],
+              }),
+            ],
+            columnSpan: 5,
+            shading: { fill: "D9D9D9" },
+          }),
+        ],
+      }),
+
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Halogenados", bold: true, size: 14 })] })],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: (asNumber(residuo.halogenados) ?? 0) > 0 ? "SIM" : "NÃO", size: 14 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Enxofre ou Sulfurados", bold: true, size: 14 })],
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({ text: toBoolean(residuo.enxofre ?? residuo.presencaEnxofre) ? "SIM" : "NÃO", size: 14 }),
+                ],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+            columnSpan: 2,
+          }),
+        ],
+      }),
+
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Acetonitrila", bold: true, size: 14 })] })],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: (asNumber(residuo.acetonitrila) ?? 0) > 0 ? "SIM" : "NÃO", size: 14 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Cianetos ou Gerador de cianetos", bold: true, size: 14 })],
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({ text: toBoolean(residuo.cianeto ?? residuo.geradorCianetos) ? "SIM" : "NÃO", size: 14 }),
+                ],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+            columnSpan: 2,
+          }),
+        ],
+      }),
+
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Metais Pesados", bold: true, size: 14 })] })],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: (asNumber(residuo.metaisPesados) ?? 0) > 0 ? "SIM" : "NÃO", size: 14 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Aminas", bold: true, size: 14 })] })],
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: toBoolean(residuo.aminas) ? "SIM" : "NÃO", size: 14 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+            columnSpan: 2,
+          }),
+        ],
+      }),
+
+      // Tabela de composição
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Compostos (Inclusive água)", bold: true, size: 14 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+            columnSpan: 4,
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: "Porcentagem no Resíduo", bold: true, size: 14 })],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+          }),
+        ],
+      }),
+
+      // 4 linhas para composição
+      ...criarLinhasComposicao(residuo),
+
+      // Linha final: Aviso
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: "ATENÇÃO: Utilize apenas 75% do volume do frasco",
+                    bold: true,
+                    size: 20,
+                    color: "FF0000",
+                  }),
+                ],
+                alignment: AlignmentType.CENTER,
+              }),
+            ],
+            columnSpan: 5,
+            shading: { fill: "FFFF00" },
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+function criarLinhasComposicao(residuo: any): TableRow[] {
+  const linhas: TableRow[] = [];
+
+  // Linha 1: Halogenados
+  linhas.push(
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: "Halogenados", size: 14 })] })],
+          columnSpan: 4,
         }),
-
-        // Linha 2: Departamento
-        new TableRow({
+        new TableCell({
           children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Departamento: ", bold: true }),
-                    new TextRun({ text: residuo.departamento || "" }),
-                  ],
-                }),
-              ],
-              columnSpan: 2,
-            }),
-          ],
-        }),
-
-        // Linha 3: Laboratório/Responsável
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Laboratório/Responsável: ", bold: true }),
-                    new TextRun({ text: "LERP / Prof. Dr. Roniérik Pioli Vieira" }),
-                  ],
-                }),
-              ],
-              columnSpan: 2,
-            }),
-          ],
-        }),
-
-        // Linha 4: Responsável pelo preenchimento
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Responsável: ", bold: true }),
-                    new TextRun({ text: residuo.responsavel || "" }),
-                  ],
-                }),
-              ],
-              width: { size: 60, type: WidthType.PERCENTAGE },
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Data: ", bold: true }),
-                    new TextRun({
-                      text: residuo.data ? new Date(residuo.data).toLocaleDateString("pt-BR") : "",
-                    }),
-                  ],
-                }),
-              ],
-              width: { size: 40, type: WidthType.PERCENTAGE },
-            }),
-          ],
-        }),
-
-        // Linha 5: Composição
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Composição do Resíduo: ", bold: true }),
-                    new TextRun({ text: residuo.composicao || "" }),
-                  ],
-                }),
-              ],
-              columnSpan: 2,
-            }),
-          ],
-        }),
-
-        // Linha 6: Classe e Estado
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Classe: ", bold: true }),
-                    new TextRun({ text: residuo.classe || "" }),
-                  ],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Estado: ", bold: true }),
-                    new TextRun({ text: residuo.estado || "" }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }),
-
-        // Linha 7: pH e Recipiente
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "pH: ", bold: true }),
-                    new TextRun({ text: residuo.ph ? String(residuo.ph) : "" }),
-                  ],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Recipiente: ", bold: true }),
-                    new TextRun({ text: residuo.tipoRecipiente || "" }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }),
-
-        // Linha 8: Volumes
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Volume do resíduo (L): ", bold: true }),
-                    new TextRun({ text: String(residuo.volumeAtual || residuo.volume || "") }),
-                  ],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Volume do recipiente (L): ", bold: true }),
-                    new TextRun({ text: String(residuo.volumeRecipiente || "") }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }),
-
-        // Linha 9: Checklist - Título
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "CHECKLIST DE SEGURANÇA", bold: true, size: 22 }),
-                  ],
-                  alignment: AlignmentType.CENTER,
-                }),
-              ],
-              columnSpan: 2,
-              shading: { fill: "EEEEEE" },
-            }),
-          ],
-        }),
-
-        // Linha 10-12: Checkboxes
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Halogenados: " }),
-                    new TextRun({ text: residuo.halogenados ? "SIM ☑" : "NÃO ☐", bold: true }),
-                    new TextRun({ text: ` (${residuo.halogenados || 0}%)` }),
-                  ],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Enxofre/Sulfurados: " }),
-                    new TextRun({ text: residuo.enxofre ? "SIM ☑" : "NÃO ☐", bold: true }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }),
-
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Acetonitrila: " }),
-                    new TextRun({ text: residuo.acetonitrila ? "SIM ☑" : "NÃO ☐", bold: true }),
-                    new TextRun({ text: ` (${residuo.acetonitrila || 0}%)` }),
-                  ],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Cianetos: " }),
-                    new TextRun({ text: residuo.cianeto ? "SIM ☑" : "NÃO ☐", bold: true }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }),
-
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Metais Pesados: " }),
-                    new TextRun({ text: residuo.metaisPesados ? "SIM ☑" : "NÃO ☐", bold: true }),
-                    new TextRun({ text: ` (${residuo.metaisPesados || 0}%)` }),
-                  ],
-                }),
-              ],
-            }),
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "Aminas: " }),
-                    new TextRun({ text: residuo.aminas ? "SIM ☑" : "NÃO ☐", bold: true }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }),
-
-        // Linha 13: Aviso
-        new TableRow({
-          children: [
-            new TableCell({
-              children: [
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: "ATENÇÃO: Utilize apenas 75% do volume do frasco",
-                      bold: true,
-                      color: "FF0000",
-                      size: 20,
-                    }),
-                  ],
-                  alignment: AlignmentType.CENTER,
-                }),
-              ],
-              columnSpan: 2,
-              shading: { fill: "FFEEEE" },
+            new Paragraph({
+              children: [new TextRun({ text: `${asNumber(residuo.halogenados) ?? 0}%`, size: 14 })],
+              alignment: AlignmentType.CENTER,
             }),
           ],
         }),
@@ -806,5 +962,60 @@ function criarRotulo(residuo: any): any[] {
     })
   );
 
-  return elements;
+  // Linha 2: Acetonitrila
+  linhas.push(
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: "Acetonitrila", size: 14 })] })],
+          columnSpan: 4,
+        }),
+        new TableCell({
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text: `${asNumber(residuo.acetonitrila) ?? 0}%`, size: 14 })],
+              alignment: AlignmentType.CENTER,
+            }),
+          ],
+        }),
+      ],
+    })
+  );
+
+  // Linha 3: Metais Pesados
+  linhas.push(
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: "Metais Pesados", size: 14 })] })],
+          columnSpan: 4,
+        }),
+        new TableCell({
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text: `${asNumber(residuo.metaisPesados) ?? 0}%`, size: 14 })],
+              alignment: AlignmentType.CENTER,
+            }),
+          ],
+        }),
+      ],
+    })
+  );
+
+  // Linha 4: Outros
+  linhas.push(
+    new TableRow({
+      children: [
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: "Outros", size: 14 })] })],
+          columnSpan: 4,
+        }),
+        new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: "", size: 14 })] })],
+        }),
+      ],
+    })
+  );
+
+  return linhas;
 }
