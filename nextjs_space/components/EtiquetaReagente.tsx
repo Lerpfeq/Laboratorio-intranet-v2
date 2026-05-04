@@ -60,7 +60,7 @@ const buttonStyles = `
     position: relative;
   }
   .etiqueta-box.vencido::before {
-    content: 'EXPIRED';
+    content: 'EXPIRADO';
     position: absolute;
     top: 50%;
     left: 50%;
@@ -88,7 +88,9 @@ function buildLabelHtml(
     : '-';
 
   const watermark = isVencido
-    ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-28deg);font-size:64px;font-weight:800;color:rgba(192,57,43,0.18);letter-spacing:6px;pointer-events:none;white-space:nowrap;z-index:2;font-family:Arial,sans-serif;">EXPIRED</div>`
+    ? `
+      <div style="position:absolute;inset:0;background:rgba(204,204,204,0.28);pointer-events:none;z-index:1;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-28deg);font-size:64px;font-weight:800;color:rgba(192,57,43,0.28);letter-spacing:6px;pointer-events:none;white-space:nowrap;z-index:2;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;">EXPIRADO</div>`
     : '';
 
   const logoHtml = logoUrl

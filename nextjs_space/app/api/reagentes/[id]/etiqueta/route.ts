@@ -35,7 +35,7 @@ export async function GET(
       );
     }
 
-    const pdfBuffer = await gerarEtiquetaReagente({
+    const reagente = {
       nome: entrada.reagente.nome,
       codigoInterno: entrada.codigoInterno,
       categoria: entrada.categoria,
@@ -47,7 +47,9 @@ export async function GET(
       notaFiscal: entrada.notaFiscal,
       responsavel: entrada.responsavel,
       perigos: entrada.perigos,
-    });
+    };
+
+    const pdfBuffer = await gerarEtiquetaReagente(reagente);
 
     return NextResponse.json({
       success: true,

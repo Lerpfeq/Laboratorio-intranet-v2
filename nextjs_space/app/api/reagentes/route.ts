@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { gerarEtiquetaReagente } from "@/lib/reagentes-label";
 export const dynamic = "force-dynamic";
 
 // Maps English category names to their single-letter code
@@ -149,7 +150,26 @@ export async function POST(request: NextRequest) {
           include: { reagente: true },
         });
 
-        createdEntradas.push(entrada);
+        // Gera a etiqueta PDF já no cadastro para garantir o mesmo template da reemissão
+        const etiquetaPdf = await gerarEtiquetaReagente({
+          nome: entrada.reagente.nome,
+          codigoInterno: entrada.codigoInterno,
+          categoria: entrada.categoria,
+          concentracao: entrada.concentracao,
+          localizacao: entrada.localizacao,
+          dataValidade: entrada.dataValidade,
+          dataEntrada: entrada.dataEntrada,
+          fornecedor: entrada.fornecedor,
+          notaFiscal: entrada.notaFiscal,
+          responsavel: entrada.responsavel,
+          perigos: entrada.perigos,
+        });
+
+        createdEntradas.push({
+          ...entrada,
+          etiquetaPdfBase64: etiquetaPdf.toString("base64"),
+          etiquetaFileName: `etiqueta-${entrada.codigoInterno}.pdf`,
+        });
       }
 
       return createdEntradas;
