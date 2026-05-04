@@ -269,16 +269,25 @@ function setCellValuePreservingStyle(
   address: string,
   value: string | number,
   type: "s" | "n",
-  fallbackStyleAddress?: string
+  fallbackStyleAddress?: string,
+  styleOverrides?: any
 ): void {
-  const style = cloneCellStyle(worksheet, address, fallbackStyleAddress);
+  const baseStyle = cloneCellStyle(worksheet, address, fallbackStyleAddress);
+  const mergedStyle =
+    baseStyle || styleOverrides
+      ? {
+          ...(baseStyle || {}),
+          ...(styleOverrides || {}),
+        }
+      : undefined;
+
   const existing = worksheet[address] as (XLSX.CellObject & { s?: any }) | undefined;
 
   worksheet[address] = {
     ...(existing || {}),
     t: type,
     v: value,
-    ...(style ? { s: style } : {}),
+    ...(mergedStyle ? { s: mergedStyle } : {}),
   };
 }
 
@@ -303,12 +312,15 @@ export async function gerarPlanilhaCampanha(
   const responsavel = metadados.responsavel || metadados.responsavelInformacoes || "";
   const data = formatDatePtBR(metadados.data);
 
+  const nomeLaboratorio =
+    "Laboratório de Engenharia de Reações Poliméricas - LERP / Prof. Dr. Roniérik Pioli Vieira";
+
   // O template possui células mescladas no cabeçalho (A1:G1, A2:G2, A3:D3, E3:G3).
   // Para garantir preenchimento consistente, escrevemos diretamente nas células do rótulo.
   setCellValuePreservingStyle(
     worksheet,
     "A1",
-    `Laboratório/ Responsável: Laboratório de Engenharia de Reações Poliméricas - LERP`,
+    `Laboratório/ Responsável: ${nomeLaboratorio}`,
     "s",
     "A1"
   );
@@ -330,6 +342,13 @@ export async function gerarPlanilhaCampanha(
 
   const startRow = 5;
 
+  const blackBorder = {
+    top: { style: "thin", color: { rgb: "000000" } },
+    bottom: { style: "thin", color: { rgb: "000000" } },
+    left: { style: "thin", color: { rgb: "000000" } },
+    right: { style: "thin", color: { rgb: "000000" } },
+  };
+
   residuos.forEach((residuo, idx) => {
     const row = startRow + idx;
     const fallbackRow = startRow;
@@ -349,14 +368,27 @@ export async function gerarPlanilhaCampanha(
       `A${row}`,
       numeroOrdinal,
       "n",
-      `A${fallbackRow}`
+      `A${fallbackRow}`,
+      { border: blackBorder }
     );
-    setCellValuePreservingStyle(worksheet, `B${row}`, composicao, "s", `B${fallbackRow}`);
-    setCellValuePreservingStyle(worksheet, `C${row}`, classe, "s", `C${fallbackRow}`);
-    setCellValuePreservingStyle(worksheet, `D${row}`, estado, "s", `D${fallbackRow}`);
-    setCellValuePreservingStyle(worksheet, `E${row}`, tipoRecipiente, "s", `E${fallbackRow}`);
-    setCellValuePreservingStyle(worksheet, `F${row}`, volumeAtual, "n", `F${fallbackRow}`);
-    setCellValuePreservingStyle(worksheet, `G${row}`, volumeRecipiente, "n", `G${fallbackRow}`);
+    setCellValuePreservingStyle(worksheet, `B${row}`, composicao, "s", `B${fallbackRow}`, {
+      border: blackBorder,
+    });
+    setCellValuePreservingStyle(worksheet, `C${row}`, classe, "s", `C${fallbackRow}`, {
+      border: blackBorder,
+    });
+    setCellValuePreservingStyle(worksheet, `D${row}`, estado, "s", `D${fallbackRow}`, {
+      border: blackBorder,
+    });
+    setCellValuePreservingStyle(worksheet, `E${row}`, tipoRecipiente, "s", `E${fallbackRow}`, {
+      border: blackBorder,
+    });
+    setCellValuePreservingStyle(worksheet, `F${row}`, volumeAtual, "n", `F${fallbackRow}`, {
+      border: blackBorder,
+    });
+    setCellValuePreservingStyle(worksheet, `G${row}`, volumeRecipiente, "n", `G${fallbackRow}`, {
+      border: blackBorder,
+    });
   });
 
   const currentRange = XLSX.utils.decode_range(worksheet["!ref"] || "A1:G10");
