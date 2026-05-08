@@ -209,7 +209,7 @@ export default function EtiquetaReagente({ entrada, logoUrl }: EtiquetaProps) {
         <div className="cut-guide-wrapper">
           <div
             ref={printRef}
-            className={`etiqueta-box${isVencido ? ' vencido' : ''}`}
+            className={`etiqueta-box${isVencido ? ' EXPIRED' : ''}`}
             style={{
               width: '15cm',
               border: '2px solid #2c3e50',
