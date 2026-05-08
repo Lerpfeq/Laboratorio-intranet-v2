@@ -60,7 +60,7 @@ const buttonStyles = `
     position: relative;
   }
   .etiqueta-box.vencido::before {
-    content: 'EXPIRADO';
+    content: 'EXPIRED';
     position: absolute;
     top: 50%;
     left: 50%;
