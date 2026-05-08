@@ -119,7 +119,9 @@ export default function ReagentesPage() {
 
         {tab === 'consulta' && <ConsultaReagentes userCategory={user?.category} />}
         {tab === 'entrada' && (isPosGraduando || isAdmin) && <EntradaForm onSuccess={fetchUserAndReagentes} />}
-        {tab === 'saida' && (isPosGraduando || isAdmin) && <SaidaForm reagentes={reagentes} onSuccess={fetchUserAndReagentes} />}
+        {tab === 'saida' && (isPosGraduando || isAdmin) && (
+          <SaidaForm onSuccess={fetchUserAndReagentes} responsavelPadrao={session?.user?.name || user?.name || ''} />
+        )}
       </main>
     </div>
   );
@@ -565,38 +567,62 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagent[]; onSuccess: () => void }) {
+function SaidaForm({ onSuccess, responsavelPadrao }: { onSuccess: () => void; responsavelPadrao: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [codigoInterno, setCodigoInterno] = useState('');
+  const [volumeSaida, setVolumeSaida] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [reagente, setReagente] = useState<any>(null);
 
-  const entradasComCodigo = reagentes.flatMap((reagente) =>
-    (reagente.entradas || [])
-      .filter((entrada) => !!entrada.codigoInterno)
-      .map((entrada) => ({
-        reagenteId: reagente.id,
-        nome: reagente.nome,
-        codigoInterno: entrada.codigoInterno,
-      }))
-  );
+  const buscarPorCodigo = async () => {
+    if (!codigoInterno.trim()) {
+      setMessage('Digite o código interno para buscar.');
+      return;
+    }
+
+    setLoading(true);
+    setMessage('');
+
+    try {
+      const response = await fetch(`/api/reagentes/buscar-codigo?codigo=${encodeURIComponent(codigoInterno)}`);
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setReagente(data.reagente);
+        setMessage('Reagente encontrado. Preencha o volume de saída para registrar.');
+      } else {
+        setReagente(null);
+        setMessage(data.error || 'Reagente não encontrado.');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar reagente:', error);
+      setMessage('Erro ao buscar reagente.');
+      setReagente(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const reagenteSelecionado = entradasComCodigo.find(
-      (entrada) => entrada.codigoInterno === codigoInterno
-    );
-
-    if (!reagenteSelecionado) {
-      setMessage('Please select a valid reagent by internal code.');
+    if (!reagente) {
+      setMessage('Busque um reagente pelo código antes de registrar a saída.');
       return;
     }
 
-    const confirmarExclusao = window.confirm(
-      `Are you sure you want to permanently remove the reagent "${reagenteSelecionado.nome}" (code ${codigoInterno})? This action cannot be undone.`
+    const saidaNumero = Number.parseFloat(volumeSaida);
+    if (!Number.isFinite(saidaNumero) || saidaNumero <= 0) {
+      setMessage('Informe um volume de saída válido.');
+      return;
+    }
+
+    const confirmarSaida = window.confirm(
+      `Confirmar saída do frasco ${reagente.codigo} (${reagente.nome}) com volume ${saidaNumero}?`
     );
 
-    if (!confirmarExclusao) {
+    if (!confirmarSaida) {
       return;
     }
 
@@ -607,48 +633,97 @@ function SaidaForm({ reagentes, onSuccess }: { reagentes: Reagent[]; onSuccess: 
       const res = await fetch('/api/reagentes/saida', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigoInterno }),
+        body: JSON.stringify({
+          reagenteId: reagente.id,
+          codigo: reagente.codigo,
+          volumeSaida: saidaNumero,
+          motivo,
+          responsavel: responsavelPadrao,
+        }),
       });
 
-      if (res.ok) {
-        setMessage('Output recorded: reagent permanently removed.');
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setMessage(data.removido ? 'Saída registrada e frasco removido do estoque.' : `Saída registrada. Novo volume: ${data.novoVolume}`);
         setCodigoInterno('');
+        setReagente(null);
+        setVolumeSaida('');
+        setMotivo('');
         onSuccess();
       } else {
-        const data = await res.json().catch(() => ({}));
-        setMessage(data.error || 'Error recording output.');
+        setMessage(data.error || 'Erro ao registrar saída.');
       }
     } catch (error) {
-      setMessage('Error recording output.');
+      console.error('Erro ao registrar saída:', error);
+      setMessage('Erro ao registrar saída.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ maxWidth: '600px', margin: '0 auto' }}>
+    <form onSubmit={handleSubmit} style={{ maxWidth: '700px', margin: '0 auto' }}>
       <div className="form-group">
-        <label>Reagent Internal Code *</label>
-        <select
-          value={codigoInterno}
-          onChange={(e) => setCodigoInterno(e.target.value)}
-          required
-        >
-          <option value="">Select internal code</option>
-          {entradasComCodigo.map((entrada) => (
-            <option key={`${entrada.reagenteId}-${entrada.codigoInterno}`} value={entrada.codigoInterno}>
-              {entrada.codigoInterno} — {entrada.nome}
-            </option>
-          ))}
-        </select>
+        <label>Internal Code *</label>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <input
+            type="text"
+            value={codigoInterno}
+            onChange={(e) => setCodigoInterno(e.target.value.toUpperCase())}
+            placeholder="Ex: LERP-U5833"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                buscarPorCodigo();
+              }
+            }}
+          />
+          <button type="button" className="button" disabled={loading} onClick={buscarPorCodigo}>
+            {loading ? 'Buscando...' : '🔍 Buscar'}
+          </button>
+        </div>
+      </div>
+
+      {reagente && (
+        <div style={{ border: '1px solid #d9e2ec', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', background: '#fafcff' }}>
+          <h3 style={{ marginTop: 0 }}>Reagente Encontrado</h3>
+          <p><strong>Código:</strong> {reagente.codigo}</p>
+          <p><strong>Nome:</strong> {reagente.nome}</p>
+          <p><strong>Fabricante:</strong> {reagente.fabricante || '-'}</p>
+          <p><strong>Localização:</strong> {reagente.localizacao || '-'}</p>
+          <p><strong>Volume disponível:</strong> {reagente.volume || '-'}</p>
+        </div>
+      )}
+
+      <div className="form-group">
+        <label>Volume de saída</label>
+        <input
+          type="number"
+          min="0"
+          step="0.001"
+          value={volumeSaida}
+          onChange={(e) => setVolumeSaida(e.target.value)}
+          placeholder="Ex: 0.25"
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Motivo / Uso</label>
+        <input
+          type="text"
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="Ex: Experimento X"
+        />
       </div>
 
       <button type="submit" disabled={loading} className="button button-primary">
-        {loading ? 'Removing...' : 'Confirm Output & Remove Reagent'}
+        {loading ? 'Registrando...' : '✅ Registrar Saída'}
       </button>
 
       {message && (
-        <div className={message.includes('recorded') ? 'success-message' : 'error-message'}>
+        <div className={message.includes('registrada') || message.includes('Novo volume') ? 'success-message' : 'error-message'}>
           {message}
         </div>
       )}

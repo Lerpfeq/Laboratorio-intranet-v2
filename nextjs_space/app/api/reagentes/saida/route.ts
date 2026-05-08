@@ -5,6 +5,13 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+function parseVolume(value?: string | null): number {
+  if (!value) return 0;
+  const normalized = value.replace(",", ".").trim();
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,26 +25,35 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { codigoInterno } = body;
+    const reagenteId = typeof body.reagenteId === "string" ? body.reagenteId : undefined;
+    const codigoInformado =
+      typeof body.codigo === "string"
+        ? body.codigo
+        : typeof body.codigoInterno === "string"
+          ? body.codigoInterno
+          : "";
+    const codigoInterno = codigoInformado.trim().toUpperCase();
 
-    if (!codigoInterno || typeof codigoInterno !== "string") {
-      return NextResponse.json(
-        { error: "Código interno é obrigatório" },
-        { status: 400 }
-      );
-    }
+    const volumeSaidaInformado = Number.parseFloat(String(body.volumeSaida ?? "0"));
+    const volumeSaida = Number.isFinite(volumeSaidaInformado) && volumeSaidaInformado > 0 ? volumeSaidaInformado : null;
 
-    const entrada = await prisma.reagenteEntrada.findUnique({
-      where: { codigoInterno },
-      include: {
-        reagente: {
-          select: {
-            id: true,
-            nome: true,
-          },
-        },
-      },
-    });
+    const motivo = typeof body.motivo === "string" ? body.motivo.trim() : "";
+
+    const entradaPorId = reagenteId
+      ? await prisma.reagenteEntrada.findUnique({
+          where: { id: reagenteId },
+          include: { reagente: true },
+        })
+      : null;
+
+    const entradaPorCodigo = !entradaPorId && codigoInterno
+      ? await prisma.reagenteEntrada.findUnique({
+          where: { codigoInterno },
+          include: { reagente: true },
+        })
+      : null;
+
+    const entrada = entradaPorId ?? entradaPorCodigo;
 
     if (!entrada?.reagente) {
       return NextResponse.json(
@@ -46,22 +62,78 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const reagenteRemovido = await prisma.reagente.delete({
-      where: { id: entrada.reagenteId },
-      select: {
-        id: true,
-        nome: true,
-      },
+    const volumeDisponivel = parseVolume(entrada.volume);
+
+    if (volumeSaida !== null && volumeDisponivel > 0 && volumeSaida > volumeDisponivel) {
+      return NextResponse.json(
+        { error: "Volume de saída maior que o volume disponível" },
+        { status: 400 }
+      );
+    }
+
+    const observacoesSaida = [
+      `Código interno: ${entrada.codigoInterno}`,
+      volumeSaida !== null ? `Volume de saída: ${volumeSaida}` : null,
+      volumeDisponivel > 0 && volumeSaida !== null ? `Volume restante: ${Math.max(volumeDisponivel - volumeSaida, 0)}` : null,
+      motivo ? `Motivo: ${motivo}` : null,
+      body.responsavel ? `Responsável informado: ${body.responsavel}` : null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    const novoVolume =
+      volumeDisponivel > 0 && volumeSaida !== null
+        ? Math.max(volumeDisponivel - volumeSaida, 0)
+        : 0;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.reagenteSaida.create({
+        data: {
+          reagenteId: entrada.reagenteId,
+          usuarioId: session.user.id,
+          dataSaida: new Date(),
+          quantidade: 1,
+          observacoes: observacoesSaida || null,
+        },
+      });
+
+      if (volumeDisponivel > 0 && volumeSaida !== null && novoVolume > 0) {
+        await tx.reagenteEntrada.update({
+          where: { id: entrada.id },
+          data: {
+            volume: String(novoVolume),
+          },
+        });
+      } else {
+        await tx.reagenteEntrada.delete({
+          where: { id: entrada.id },
+        });
+      }
+
+      const entradasRestantes = await tx.reagenteEntrada.count({
+        where: { reagenteId: entrada.reagenteId },
+      });
+
+      await tx.reagente.update({
+        where: { id: entrada.reagenteId },
+        data: {
+          status: entradasRestantes > 0 ? "ok" : "esgotado",
+          ultimaAtualizacao: new Date(),
+        },
+      });
     });
 
     return NextResponse.json(
       {
-        message: "Reagente removido definitivamente com sucesso",
-        reagente: reagenteRemovido,
+        success: true,
+        codigoInterno: entrada.codigoInterno,
+        novoVolume,
+        removido: !(volumeDisponivel > 0 && volumeSaida !== null && novoVolume > 0),
       },
       { status: 200 }
     );
   } catch (error: any) {
+    console.error("Erro ao registrar saída:", error);
     return NextResponse.json(
       { error: error?.message || "Erro ao registrar saída" },
       { status: 500 }

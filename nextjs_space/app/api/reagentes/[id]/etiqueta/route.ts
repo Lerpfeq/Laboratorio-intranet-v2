@@ -35,7 +35,8 @@ export async function GET(
       );
     }
 
-    const reagente = {
+    // Mantém EXATAMENTE o mesmo payload usado no POST de entrada (/api/reagentes)
+    const etiquetaPayload = {
       nome: entrada.reagente.nome,
       codigoInterno: entrada.codigoInterno,
       categoria: entrada.categoria,
@@ -49,7 +50,7 @@ export async function GET(
       perigos: entrada.perigos,
     };
 
-    const pdfBuffer = await gerarEtiquetaReagente(reagente);
+    const pdfBuffer = await gerarEtiquetaReagente(etiquetaPayload);
 
     return NextResponse.json({
       success: true,
