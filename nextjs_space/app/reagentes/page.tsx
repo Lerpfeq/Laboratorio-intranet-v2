@@ -701,7 +701,7 @@ function SaidaForm() {
           <h3>⚠️ Reagent Found:</h3>
           <p><strong>Code:</strong> {reagente.codigo}</p>
           <p><strong>Name:</strong> {reagente.nome}</p>
-          <p><strong>Brand:</strong> {reagente.fabricante || '-'}</p>
+          <p><strong>Brand:</strong> {reagente.marca || '-'}</p>
           <p><strong>Location:</strong> {reagente.localizacao || '-'}</p>
           <p><strong>Entry date:</strong> {reagente.dataEntrada ? new Date(reagente.dataEntrada).toLocaleDateString('en-US') : '-'}</p>
 

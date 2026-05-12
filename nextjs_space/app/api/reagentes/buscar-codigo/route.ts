@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         reagenteId: reagenteEntrada.reagenteId,
         codigo: reagenteEntrada.codigoInterno,
         nome: reagenteEntrada.reagente.nome,
-        fabricante: reagenteEntrada.marca || reagenteEntrada.reagente.marca || "-",
+        marca: reagenteEntrada.marca || reagenteEntrada.reagente.marca || "-",
         localizacao: reagenteEntrada.localizacao || "-",
         quantidade: reagenteEntrada.quantidade,
         quantidadeAtual: reagenteEntrada.quantidadeAtual,

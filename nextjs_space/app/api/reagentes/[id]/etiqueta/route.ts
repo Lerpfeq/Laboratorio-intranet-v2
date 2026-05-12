@@ -45,6 +45,7 @@ export async function GET(
       dataValidade: entrada.dataValidade,
       dataEntrada: entrada.dataEntrada,
       fornecedor: entrada.fornecedor,
+      marca: entrada.marca || entrada.reagente.marca,
       notaFiscal: entrada.notaFiscal,
       responsavel: entrada.responsavel,
       perigos: entrada.perigos,
