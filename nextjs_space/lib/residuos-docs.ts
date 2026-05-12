@@ -18,6 +18,26 @@ import {
 
 // Dependência xlsx-style instalada para compatibilidade com ambientes legados.
 
+/**
+ * Sanitize text for PDF Standard Fonts (WinAnsi encoding).
+ * Replaces characters outside WinAnsi with ASCII equivalents or removes them.
+ */
+function sanitizeForPdf(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/⚠️?/g, "/!\\")   // warning sign
+    .replace(/△/g, "/!\\")      // triangle
+    .replace(/—/g, "-")          // em dash
+    .replace(/–/g, "-")          // en dash
+    .replace(/'/g, "'")          // smart quote left
+    .replace(/'/g, "'")          // smart quote right
+    .replace(/"/g, '"')          // smart double quote left
+    .replace(/"/g, '"')          // smart double quote right
+    .replace(/…/g, "...")        // ellipsis
+    .replace(/•/g, "-")          // bullet
+    .replace(/[^\x00-\xFF]/g, ""); // remove any remaining non-WinAnsi chars
+}
+
 type ResiduoDoc = {
   id?: string;
   numeroRecipiente?: number | string | null;
@@ -146,7 +166,7 @@ export async function gerarEtiquetaInterna(residuo: ResiduoDoc): Promise<Buffer>
 
   const drawField = (label: string, value: string, x: number, y: number, labelWidth = 130) => {
     page.drawText(`${label}:`, { x, y, size: 10, font: fontBold, color: rgb(0, 0, 0) });
-    page.drawText(value || "-", {
+    page.drawText(sanitizeForPdf(value) || "-", {
       x: x + labelWidth,
       y,
       size: 10,

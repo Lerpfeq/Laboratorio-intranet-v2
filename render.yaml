@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: lerp-intranet
+    runtime: node
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: nextjs_space
+    buildCommand: "yarn install --production=false && yarn prisma generate && yarn build"
+    startCommand: "yarn start"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: NODE_ENV
+        value: production

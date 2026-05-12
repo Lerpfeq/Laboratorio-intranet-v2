@@ -19,6 +19,25 @@ type ReagenteEtiquetaPayload = {
   perigos?: string | null;
 };
 
+/**
+ * Sanitize text for PDF Standard Fonts (WinAnsi encoding).
+ */
+function sanitizeForPdf(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/⚠️?/g, "/!\\")
+    .replace(/△/g, "/!\\")
+    .replace(/—/g, "-")
+    .replace(/–/g, "-")
+    .replace(/\u2018/g, "'")
+    .replace(/\u2019/g, "'")
+    .replace(/\u201C/g, '"')
+    .replace(/\u201D/g, '"')
+    .replace(/…/g, "...")
+    .replace(/•/g, "-")
+    .replace(/[^\x00-\xFF]/g, "");
+}
+
 function formatDate(value?: Date | string | null, locale = "en-US"): string {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
@@ -99,7 +118,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
   let y = pageHeight - 20;
   const nomeMaxWidth = pageWidth - x - 10;
 
-  page.drawText(payload.nome?.trim() || "Reagent", {
+  page.drawText(sanitizeForPdf(payload.nome?.trim() || "Reagent"), {
     x,
     y,
     size: 16,
@@ -109,7 +128,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
   });
 
   y -= 12;
-  page.drawText("LERP — Polymer Reaction Engineering Laboratory", {
+  page.drawText("LERP - Polymer Reaction Engineering Laboratory", {
     x,
     y,
     size: 7,
@@ -149,7 +168,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
 
   if (payload.concentracao?.trim()) {
     const codigoWidth = fontBold.widthOfTextAtSize(codigo, 11);
-    page.drawText(`  ${payload.concentracao.trim()}`, {
+    page.drawText(sanitizeForPdf(`  ${payload.concentracao.trim()}`), {
       x: 15 + codigoWidth + 10,
       y: boxY + 4,
       size: 10,
@@ -170,7 +189,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
   });
 
   y -= 10;
-  page.drawText(payload.responsavel?.trim() || "", {
+  page.drawText(sanitizeForPdf(payload.responsavel?.trim() || ""), {
     x: 15,
     y,
     size: 9,
@@ -189,7 +208,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
     color: rgb(0.88, 0.9, 0.92),
   });
 
-  page.drawText(`Entry: ${entrada}    Brand: ${marcaLabel}`, {
+  page.drawText(sanitizeForPdf(`Entry: ${entrada}    Brand: ${marcaLabel}`), {
     x: 15,
     y: 12,
     size: 7,
