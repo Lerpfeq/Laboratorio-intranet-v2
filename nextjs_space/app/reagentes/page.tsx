@@ -288,10 +288,11 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
 }
 
 function EntradaForm() {
+  const { data: session } = useSession() || {};
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [showPreview, setShowPreview] = useState(false);
-  const [reagenteCadastrado, setReagenteCadastrado] = useState<{ id: string; codigo: string } | null>(null);
+  const [reagentesCriados, setReagentesCriados] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -308,6 +309,13 @@ function EntradaForm() {
     responsavel: '',
   });
 
+  // Auto-fill responsible from session
+  useEffect(() => {
+    if (session?.user?.name && !formData.responsavel) {
+      setFormData((prev) => ({ ...prev, responsavel: session.user?.name || '' }));
+    }
+  }, [session?.user?.name]);
+
   const resetForm = () => {
     setFormData({
       nome: '',
@@ -321,14 +329,27 @@ function EntradaForm() {
       categoria: '',
       localizacao: '',
       concentracao: '',
-      responsavel: '',
+      responsavel: session?.user?.name || '',
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setMessage('');
+
+    // Validate Expiry Date (required unless indeterminate)
+    if (!formData.validadeIndeterminada && !formData.dataValidade) {
+      setMessage('Please select an Expiry Date or mark as Indeterminate.');
+      return;
+    }
+
+    // Validate Responsible (required)
+    if (!formData.responsavel.trim()) {
+      setMessage('Responsible is a required field.');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const payload = {
@@ -347,11 +368,7 @@ function EntradaForm() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          const primeiraEntrada = data[0];
-          setReagenteCadastrado({
-            id: primeiraEntrada.id,
-            codigo: primeiraEntrada.codigoInterno,
-          });
+          setReagentesCriados(data);
           setShowPreview(true);
           setMessage(`Reagent successfully added! ${data.length} label${data.length > 1 ? 's' : ''} generated.`);
         }
@@ -366,13 +383,13 @@ function EntradaForm() {
     }
   };
 
-  if (showPreview && reagenteCadastrado) {
+  if (showPreview && reagentesCriados.length > 0) {
     return (
       <ReagenteLabelPreview
-        reagente={reagenteCadastrado}
+        reagentes={reagentesCriados}
         onRegisterAnother={() => {
           setShowPreview(false);
-          setReagenteCadastrado(null);
+          setReagentesCriados([]);
           setMessage('');
           resetForm();
         }}
@@ -449,13 +466,14 @@ function EntradaForm() {
       </div>
 
       <div className="form-group">
-        <label>Expiry Date</label>
+        <label>Expiry Date {!formData.validadeIndeterminada && <span style={{ color: '#d32f2f' }}>*</span>}</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <input
             type="date"
             value={formData.dataValidade}
             onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
             disabled={formData.validadeIndeterminada}
+            required={!formData.validadeIndeterminada}
             style={formData.validadeIndeterminada ? { opacity: 0.5 } : {}}
           />
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }}>
@@ -494,15 +512,21 @@ function EntradaForm() {
         />
       </div>
 
-
       <div className="form-group">
-        <label>Responsible</label>
+        <label>Responsible <span style={{ color: '#d32f2f' }}>*</span></label>
         <input
           type="text"
           value={formData.responsavel}
           onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
           placeholder="Name of responsible person"
+          required
+          style={{ backgroundColor: session?.user?.name ? '#f5f5f5' : undefined }}
         />
+        {session?.user?.name && (
+          <small style={{ color: '#666', fontSize: '12px' }}>
+            Automatically filled from your user session
+          </small>
+        )}
       </div>
 
       <button type="submit" disabled={loading} className="button button-primary">

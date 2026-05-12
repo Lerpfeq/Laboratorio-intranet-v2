@@ -138,6 +138,15 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
   padding: 20px;
 }
 
+.label-preview-card {
+  padding: 20px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 20px;
+}
+
 .success-header {
   display: flex;
   align-items: center;
