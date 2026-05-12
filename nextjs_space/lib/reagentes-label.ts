@@ -19,10 +19,14 @@ type ReagenteEtiquetaPayload = {
 };
 
 function formatDate(value?: Date | string | null, locale = "en-US"): string {
-  if (!value) return "-";
+  if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString(locale);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(locale, {
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function isExpired(value?: Date | string | null): boolean {
@@ -49,204 +53,175 @@ async function loadLogoBytes(): Promise<Uint8Array | null> {
 
 export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
-  // Proporção próxima ao layout profissional (15cm x 8cm visual)
-  const page = pdfDoc.addPage([425, 230]);
 
-  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  // Dimensões: 12cm x 5cm ~= 340 x 142 pt
+  const page = pdfDoc.addPage([340, 142]);
+
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const pageWidth = page.getWidth();
   const pageHeight = page.getHeight();
-  const margin = 16;
-  const contentWidth = pageWidth - margin * 2;
-
   const expirado = isExpired(payload.dataValidade);
 
-  // Fundo/base da etiqueta
+  // Moldura externa
   page.drawRectangle({
-    x: margin - 2,
-    y: margin - 2,
-    width: contentWidth + 4,
-    height: pageHeight - (margin - 2) * 2,
-    borderWidth: 1.4,
+    x: 1,
+    y: 1,
+    width: pageWidth - 2,
+    height: pageHeight - 2,
+    borderWidth: 1.5,
     borderColor: rgb(0.17, 0.24, 0.32),
     color: rgb(1, 1, 1),
   });
 
-  // Overlay de vencido (cinza + marca d'água)
-  if (expirado) {
-    page.drawRectangle({
-      x: margin,
-      y: margin,
-      width: contentWidth,
-      height: pageHeight - margin * 2,
-      color: rgb(0.85, 0.85, 0.85),
-      opacity: 0.42,
-    });
-
-    page.drawText("EXPIRADO", {
-      x: pageWidth / 2 - 100,
-      y: pageHeight / 2 - 18,
-      size: 52,
-      font: fontBold,
-      color: rgb(0.82, 0.1, 0.1),
-      rotate: degrees(-28),
-      opacity: 0.55,
-    });
-  }
-
-  let y = pageHeight - 30;
-
-  // Header com logo + nome + subtítulo
+  // Header: logo em quadrado no canto superior esquerdo
+  let logoAreaWidth = 0;
   const logoBytes = await loadLogoBytes();
   if (logoBytes) {
     try {
       const logoImage = await pdfDoc.embedPng(logoBytes);
-      const targetHeight = 34;
-      const logoScale = targetHeight / logoImage.height;
-      const logoWidth = logoImage.width * logoScale;
+      const logoSize = 50;
       page.drawImage(logoImage, {
-        x: margin + 2,
-        y: y - 14,
-        width: logoWidth,
-        height: targetHeight,
+        x: 10,
+        y: pageHeight - 60,
+        width: logoSize,
+        height: logoSize,
       });
+      logoAreaWidth = logoSize + 10;
     } catch {
-      // se falhar, segue sem logo
+      logoAreaWidth = 0;
     }
   }
 
-  const nome = payload.nome?.trim() || "Reagente";
-  page.drawText(nome, {
-    x: margin + 90,
+  let x = logoAreaWidth + 15;
+  let y = pageHeight - 20;
+  const nomeMaxWidth = pageWidth - x - 10;
+
+  page.drawText(payload.nome?.trim() || "Reagent", {
+    x,
     y,
-    size: 18,
+    size: 16,
     font: fontBold,
     color: rgb(0.12, 0.18, 0.26),
+    maxWidth: nomeMaxWidth,
   });
 
-  y -= 14;
-  page.drawText("LERP — Polymer Reaction Engineering Laboratory", {
-    x: margin + 90,
-    y,
-    size: 8,
-    font: fontRegular,
-    color: rgb(0.49, 0.55, 0.62),
-  });
-
-  y -= 10;
-  page.drawLine({
-    start: { x: margin + 2, y },
-    end: { x: pageWidth - margin - 2, y },
-    thickness: 1,
-    color: rgb(0.9, 0.92, 0.94),
-  });
-
-  // Caixa cinza com INTERNAL CODE (e concentração opcional)
   y -= 12;
-  const codeBoxHeight = payload.concentracao ? 38 : 30;
+  page.drawText("LERP — Polymer Reaction Engineering Laboratory", {
+    x,
+    y,
+    size: 7,
+    font,
+    color: rgb(0.4, 0.4, 0.4),
+    maxWidth: nomeMaxWidth,
+  });
+
+  y -= 20;
+
+  // Caixa cinza com código interno
+  const boxY = y - 20;
   page.drawRectangle({
-    x: margin + 2,
-    y: y - codeBoxHeight + 6,
-    width: contentWidth - 4,
-    height: codeBoxHeight,
-    color: rgb(0.93, 0.95, 0.96),
+    x: 10,
+    y: boxY,
+    width: pageWidth - 20,
+    height: 24,
+    color: rgb(0.92, 0.92, 0.92),
   });
 
   page.drawText("INTERNAL CODE:", {
-    x: margin + 10,
-    y: y - 6,
-    size: 8,
-    font: fontBold,
-    color: rgb(0.5, 0.55, 0.6),
+    x: 15,
+    y: boxY + 14,
+    size: 7,
+    font,
+    color: rgb(0.3, 0.3, 0.3),
   });
 
-  page.drawText(payload.codigoInterno || payload.codigo || "-", {
-    x: margin + 10,
-    y: y - 19,
-    size: 12,
+  const codigo = payload.codigoInterno || payload.codigo || "";
+  page.drawText(codigo, {
+    x: 15,
+    y: boxY + 4,
+    size: 11,
     font: fontBold,
-    color: rgb(0.14, 0.2, 0.28),
+    color: rgb(0, 0, 0),
   });
 
-  if (payload.concentracao) {
-    page.drawText("CONCENTRATION:", {
-      x: pageWidth / 2 + 6,
-      y: y - 6,
-      size: 8,
-      font: fontBold,
-      color: rgb(0.5, 0.55, 0.6),
-    });
-
-    page.drawText(payload.concentracao, {
-      x: pageWidth / 2 + 6,
-      y: y - 19,
-      size: 12,
-      font: fontBold,
-      color: rgb(0.14, 0.2, 0.28),
+  if (payload.concentracao?.trim()) {
+    const codigoWidth = fontBold.widthOfTextAtSize(codigo, 11);
+    page.drawText(`  ${payload.concentracao.trim()}`, {
+      x: 15 + codigoWidth + 10,
+      y: boxY + 4,
+      size: 10,
+      font,
+      color: rgb(0.2, 0.2, 0.2),
     });
   }
+
+  y = boxY - 10;
 
   // RESPONSIBLE
-  y -= codeBoxHeight + 10;
   page.drawText("RESPONSIBLE:", {
-    x: margin + 4,
+    x: 15,
     y,
-    size: 8,
-    font: fontBold,
-    color: rgb(0.5, 0.55, 0.6),
+    size: 7,
+    font,
+    color: rgb(0.3, 0.3, 0.3),
   });
 
-  y -= 12;
-  page.drawText(payload.responsavel?.trim() || "-", {
-    x: margin + 4,
+  y -= 10;
+  page.drawText(payload.responsavel?.trim() || "", {
+    x: 15,
     y,
-    size: 10,
-    font: fontRegular,
-    color: rgb(0.13, 0.18, 0.24),
+    size: 9,
+    font,
+    color: rgb(0, 0, 0),
   });
-
-  // Bloco de risco opcional
-  if (payload.perigos?.trim()) {
-    y -= 16;
-    page.drawRectangle({
-      x: margin + 2,
-      y: y - 11,
-      width: contentWidth - 4,
-      height: 16,
-      color: rgb(1, 0.93, 0.93),
-      borderColor: rgb(0.9, 0.35, 0.35),
-      borderWidth: 0.8,
-    });
-
-    page.drawText(`⚠ ${payload.perigos}`, {
-      x: margin + 8,
-      y: y - 6,
-      size: 9,
-      font: fontBold,
-      color: rgb(0.72, 0.2, 0.2),
-    });
-  }
 
   // Rodapé
   const entrada = formatDate(payload.dataEntrada, "en-US");
-  const supplier = payload.fornecedor?.trim() || payload.fabricante?.trim() || "-";
+  const fornecedor = payload.fornecedor?.trim() || payload.fabricante?.trim() || "";
 
   page.drawLine({
-    start: { x: margin + 2, y: 44 },
-    end: { x: pageWidth - margin - 2, y: 44 },
-    thickness: 1,
-    color: rgb(0.92, 0.94, 0.96),
+    start: { x: 15, y: 20 },
+    end: { x: pageWidth - 15, y: 20 },
+    thickness: 0.7,
+    color: rgb(0.88, 0.9, 0.92),
   });
 
-  page.drawText(`Entry: ${entrada}    Supplier: ${supplier}`, {
-    x: margin + 4,
-    y: 30,
-    size: 8,
-    font: fontRegular,
-    color: rgb(0.58, 0.63, 0.68),
+  page.drawText(`Entry: ${entrada}    Supplier: ${fornecedor}`, {
+    x: 15,
+    y: 12,
+    size: 7,
+    font,
+    color: rgb(0.4, 0.4, 0.4),
+    maxWidth: pageWidth - 30,
   });
 
-  const pdfBytes = await pdfDoc.save();
-  return Buffer.from(pdfBytes);
+  // Marca d'água EXPIRED
+  if (expirado) {
+    page.drawRectangle({
+      x: 0,
+      y: 0,
+      width: pageWidth,
+      height: pageHeight,
+      color: rgb(0.85, 0.85, 0.85),
+      opacity: 0.3,
+    });
+
+    const expiredText = "EXPIRED";
+    const expiredFontSize = 40;
+    const textWidth = fontBold.widthOfTextAtSize(expiredText, expiredFontSize);
+
+    page.drawText(expiredText, {
+      x: (pageWidth - textWidth) / 2,
+      y: pageHeight / 2 - 10,
+      size: expiredFontSize,
+      font: fontBold,
+      color: rgb(0.9, 0, 0),
+      rotate: degrees(-30),
+      opacity: 0.6,
+    });
+  }
+
+  return Buffer.from(await pdfDoc.save());
 }
