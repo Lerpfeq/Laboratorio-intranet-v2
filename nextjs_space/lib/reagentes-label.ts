@@ -117,10 +117,10 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
     maxWidth: nomeMaxWidth,
   });
 
-  y -= 25;
+  y -= 30; // Increased spacing so gray box doesn't overlap logo
 
-  // Caixa cinza com código interno (ajustada para não cortar a logo)
-  const boxY = Math.min(y - 5, 70);
+  // Caixa cinza com código interno (lowered to avoid logo overlap)
+  const boxY = Math.min(y - 5, 60);
   page.drawRectangle({
     x: 10,
     y: boxY,

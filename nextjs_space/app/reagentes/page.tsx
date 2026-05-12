@@ -296,12 +296,12 @@ function EntradaForm() {
   const [formData, setFormData] = useState({
     nome: '',
     fabricante: '',
+    numeroNotaFiscal: '',
     quantidade: '',
     unidade: 'L',
     quantidadeFrascos: 1,
     dataValidade: '',
-    lote: '',
-    cas: '',
+    validadeIndeterminada: false,
     categoria: '',
     localizacao: '',
     concentracao: '',
@@ -312,12 +312,12 @@ function EntradaForm() {
     setFormData({
       nome: '',
       fabricante: '',
+      numeroNotaFiscal: '',
       quantidade: '',
       unidade: 'L',
       quantidadeFrascos: 1,
       dataValidade: '',
-      lote: '',
-      cas: '',
+      validadeIndeterminada: false,
       categoria: '',
       localizacao: '',
       concentracao: '',
@@ -335,6 +335,7 @@ function EntradaForm() {
         ...formData,
         quantidade: Number.parseFloat(formData.quantidade),
         dataEntrada: new Date().toISOString(),
+        dataValidade: formData.validadeIndeterminada ? null : (formData.dataValidade || null),
       };
 
       const res = await fetch('/api/reagentes', {
@@ -393,12 +394,23 @@ function EntradaForm() {
       </div>
 
       <div className="form-group">
-        <label>Brand/Supplier *</label>
+        <label>Supplier *</label>
         <input
           type="text"
           placeholder="Ex: Sigma-Aldrich"
           value={formData.fabricante}
           onChange={(e) => setFormData({ ...formData, fabricante: e.target.value })}
+          required
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Invoice Number *</label>
+        <input
+          type="text"
+          placeholder="Ex: NF-123456"
+          value={formData.numeroNotaFiscal}
+          onChange={(e) => setFormData({ ...formData, numeroNotaFiscal: e.target.value })}
           required
         />
       </div>
@@ -438,31 +450,29 @@ function EntradaForm() {
 
       <div className="form-group">
         <label>Expiry Date</label>
-        <input
-          type="date"
-          value={formData.dataValidade}
-          onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
-        />
-      </div>
-
-      <div className="form-group">
-        <label>Batch/Lot</label>
-        <input
-          type="text"
-          placeholder="Ex: LOT12345"
-          value={formData.lote}
-          onChange={(e) => setFormData({ ...formData, lote: e.target.value })}
-        />
-      </div>
-
-      <div className="form-group">
-        <label>CAS Number</label>
-        <input
-          type="text"
-          placeholder="Ex: 67-64-1"
-          value={formData.cas}
-          onChange={(e) => setFormData({ ...formData, cas: e.target.value })}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <input
+            type="date"
+            value={formData.dataValidade}
+            onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+            disabled={formData.validadeIndeterminada}
+            style={formData.validadeIndeterminada ? { opacity: 0.5 } : {}}
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={formData.validadeIndeterminada}
+              onChange={(e) => {
+                setFormData({
+                  ...formData,
+                  validadeIndeterminada: e.target.checked,
+                  dataValidade: e.target.checked ? '' : formData.dataValidade,
+                });
+              }}
+            />
+            <span>Indeterminate expiry date</span>
+          </label>
+        </div>
       </div>
 
       <div className="form-group">

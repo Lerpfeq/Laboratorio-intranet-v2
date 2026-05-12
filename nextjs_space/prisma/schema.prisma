@@ -150,6 +150,7 @@ model ReagenteEntrada {
   categoria       String?
   concentracao    String?
   dataValidade    DateTime?
+  validadeIndeterminada Boolean   @default(false)
   perigos         String?  @db.Text
   responsavel     String?
   createdAt       DateTime @default(now())

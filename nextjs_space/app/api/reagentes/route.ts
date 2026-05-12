@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
     const categoria = String(data.categoria ?? "").trim();
     const localizacao = String(data.localizacao ?? data.localidade ?? "").trim();
     const concentracao = String(data.concentracao ?? "").trim();
-    const lote = String(data.lote ?? data.notaFiscal ?? "").trim();
-    const cas = String(data.cas ?? "").trim();
+    const numeroNotaFiscal = String(data.numeroNotaFiscal ?? data.notaFiscal ?? data.lote ?? "").trim();
+    const validadeIndeterminada = Boolean(data.validadeIndeterminada);
     const perigos = String(data.perigos ?? "").trim();
     const quantidadeInformada = Number.parseFloat(String(data.quantidade ?? 0));
     const quantidade = Number.isFinite(quantidadeInformada) && quantidadeInformada > 0 ? quantidadeInformada : 0;
@@ -96,12 +96,12 @@ export async function POST(request: NextRequest) {
     const quantidadeFrascosRaw = Number.parseInt(String(data.quantidadeFrascos ?? data.numeroFrascos ?? 1), 10);
     const quantidadeFrascos = Number.isFinite(quantidadeFrascosRaw) && quantidadeFrascosRaw > 0 ? quantidadeFrascosRaw : 1;
 
-    if (!nome || !fabricante || quantidade <= 0) {
-      return NextResponse.json({ error: "Name, brand/supplier and quantity are required" }, { status: 400 });
+    if (!nome || !fabricante || !numeroNotaFiscal || quantidade <= 0) {
+      return NextResponse.json({ error: "Name, supplier, invoice number and quantity are required" }, { status: 400 });
     }
 
     const dataEntrada = data.dataEntrada ? new Date(data.dataEntrada) : new Date();
-    const dataValidade = data.dataValidade ? new Date(data.dataValidade) : null;
+    const dataValidade = validadeIndeterminada ? null : (data.dataValidade ? new Date(data.dataValidade) : null);
 
     const entradas = await prisma.$transaction(async (tx) => {
       let reagente = await tx.reagente.findFirst({ where: { nome, marca: fabricante } });
@@ -140,17 +140,18 @@ export async function POST(request: NextRequest) {
             usuarioId: session.user.id,
             dataEntrada,
             fornecedor: fabricante,
-            notaFiscal: lote || null,
+            notaFiscal: numeroNotaFiscal || null,
             quantidade,
             quantidadeAtual: quantidade,
             unidade,
             marca: fabricante,
             codigoInterno,
             localizacao: localizacao || null,
-            observacoes: cas ? `CAS: ${cas}` : null,
+            observacoes: null,
             categoria: categoria || null,
             concentracao: concentracao || null,
             dataValidade,
+            validadeIndeterminada,
             perigos: perigos || null,
             responsavel: String(data.responsavel ?? user?.name ?? "Not informed"),
           },

@@ -48,12 +48,12 @@ export async function GET(
         codigo: reagente.codigoInterno,
         nome: reagente.reagente.nome,
         fabricante: reagente.fornecedor || reagente.marca || reagente.reagente.marca || '',
+        numeroNotaFiscal: reagente.notaFiscal || '',
         quantidade: reagente.quantidade,
         quantidadeAtual: reagente.quantidadeAtual,
         unidade: reagente.unidade,
         dataValidade: reagente.dataValidade,
-        lote: reagente.notaFiscal,
-        cas: reagente.observacoes?.replace(/^CAS:\s*/i, '') || '',
+        validadeIndeterminada: (reagente as any).validadeIndeterminada || false,
         localizacao: reagente.localizacao,
         categoria: reagente.categoria,
         concentracao: reagente.concentracao,
@@ -113,10 +113,12 @@ export async function PUT(
     const quantidade = parseOptionalNumber(data.quantidade);
     const quantidadeAtual = parseOptionalNumber(data.quantidadeAtual);
 
-    const dataValidade =
-      data.dataValidade === null || data.dataValidade === '' || data.dataValidade === undefined
-        ? null
-        : new Date(data.dataValidade);
+    const validadeIndeterminada = typeof data.validadeIndeterminada === 'boolean' ? data.validadeIndeterminada : false;
+    const dataValidade = validadeIndeterminada
+      ? null
+      : (data.dataValidade === null || data.dataValidade === '' || data.dataValidade === undefined
+          ? null
+          : new Date(data.dataValidade));
 
     const reagenteAtualizado = await prisma.$transaction(async (tx) => {
       await tx.reagente.update({
@@ -144,11 +146,8 @@ export async function PUT(
               ? data.unidade
               : reagenteExistente.unidade,
           dataValidade,
-          notaFiscal: typeof data.lote === 'string' ? data.lote : reagenteExistente.notaFiscal,
-          observacoes:
-            typeof data.cas === 'string' && data.cas.trim()
-              ? `CAS: ${data.cas.trim()}`
-              : null,
+          validadeIndeterminada,
+          notaFiscal: typeof data.numeroNotaFiscal === 'string' ? data.numeroNotaFiscal : reagenteExistente.notaFiscal,
           localizacao:
             typeof data.localizacao === 'string'
               ? data.localizacao || null

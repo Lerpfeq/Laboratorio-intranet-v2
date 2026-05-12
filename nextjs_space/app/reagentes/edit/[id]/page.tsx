@@ -19,8 +19,8 @@ export default function EditReagentePage() {
   const [quantidadeAtual, setQuantidadeAtual] = useState('');
   const [unidade, setUnidade] = useState('L');
   const [dataValidade, setDataValidade] = useState('');
-  const [lote, setLote] = useState('');
-  const [cas, setCas] = useState('');
+  const [validadeIndeterminada, setValidadeIndeterminada] = useState(false);
+  const [numeroNotaFiscal, setNumeroNotaFiscal] = useState('');
   const [localizacao, setLocalizacao] = useState('');
   const [categoria, setCategoria] = useState('');
   const [concentracao, setConcentracao] = useState('');
@@ -40,8 +40,8 @@ export default function EditReagentePage() {
           setQuantidadeAtual(r.quantidadeAtual?.toString() || '');
           setUnidade(r.unidade || 'L');
           setDataValidade(r.dataValidade ? r.dataValidade.split('T')[0] : '');
-          setLote(r.lote || '');
-          setCas(r.cas || '');
+          setValidadeIndeterminada(r.validadeIndeterminada || false);
+          setNumeroNotaFiscal(r.numeroNotaFiscal || '');
           setLocalizacao(r.localizacao || '');
           setCategoria(r.categoria || '');
           setConcentracao(r.concentracao || '');
@@ -80,12 +80,12 @@ export default function EditReagentePage() {
         body: JSON.stringify({
           nome,
           fabricante,
+          numeroNotaFiscal,
           quantidade: Number.parseFloat(quantidade),
           quantidadeAtual: quantidadeAtual ? Number.parseFloat(quantidadeAtual) : Number.parseFloat(quantidade),
           unidade,
-          dataValidade: dataValidade || null,
-          lote,
-          cas,
+          dataValidade: validadeIndeterminada ? null : (dataValidade || null),
+          validadeIndeterminada,
           localizacao,
           categoria,
           concentracao,
@@ -134,12 +134,23 @@ export default function EditReagentePage() {
           </div>
 
           <div className="form-group">
-            <label>Brand/Supplier *</label>
+            <label>Supplier *</label>
             <input
               type="text"
               value={fabricante}
               onChange={(e) => setFabricante(e.target.value)}
               placeholder="Ex: Sigma-Aldrich"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Invoice Number *</label>
+            <input
+              type="text"
+              value={numeroNotaFiscal}
+              onChange={(e) => setNumeroNotaFiscal(e.target.value)}
+              placeholder="Ex: NF-123456"
               required
             />
           </div>
@@ -189,31 +200,28 @@ export default function EditReagentePage() {
 
           <div className="form-group">
             <label>Expiry Date</label>
-            <input
-              type="date"
-              value={dataValidade}
-              onChange={(e) => setDataValidade(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Batch/Lot</label>
-            <input
-              type="text"
-              value={lote}
-              onChange={(e) => setLote(e.target.value)}
-              placeholder="Ex: LOT12345"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>CAS Number</label>
-            <input
-              type="text"
-              value={cas}
-              onChange={(e) => setCas(e.target.value)}
-              placeholder="Ex: 67-64-1"
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <input
+                type="date"
+                value={dataValidade}
+                onChange={(e) => setDataValidade(e.target.value)}
+                disabled={validadeIndeterminada}
+                style={validadeIndeterminada ? { opacity: 0.5 } : {}}
+              />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={validadeIndeterminada}
+                  onChange={(e) => {
+                    setValidadeIndeterminada(e.target.checked);
+                    if (e.target.checked) {
+                      setDataValidade('');
+                    }
+                  }}
+                />
+                <span>Indeterminate expiry date</span>
+              </label>
+            </div>
           </div>
         </div>
 
