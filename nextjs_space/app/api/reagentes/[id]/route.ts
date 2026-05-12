@@ -47,7 +47,8 @@ export async function GET(
         id: reagente.id,
         codigo: reagente.codigoInterno,
         nome: reagente.reagente.nome,
-        fabricante: reagente.fornecedor || reagente.marca || reagente.reagente.marca || '',
+        marca: reagente.marca || reagente.reagente.marca || '',
+        fabricante: reagente.fornecedor || '',
         numeroNotaFiscal: reagente.notaFiscal || '',
         quantidade: reagente.quantidade,
         quantidadeAtual: reagente.quantidadeAtual,
@@ -101,11 +102,12 @@ export async function PUT(
     }
 
     const nome = String(data.nome ?? '').trim();
+    const marca = String(data.marca ?? '').trim();
     const fabricante = String(data.fabricante ?? '').trim();
 
     if (!nome || !fabricante) {
       return NextResponse.json(
-        { error: 'Name and brand/supplier are required' },
+        { error: 'Name and supplier are required' },
         { status: 400 }
       );
     }
@@ -125,7 +127,7 @@ export async function PUT(
         where: { id: reagenteExistente.reagenteId },
         data: {
           nome,
-          marca: fabricante,
+          marca: marca || reagenteExistente.marca || fabricante,
           localidade:
             typeof data.localizacao === 'string'
               ? data.localizacao || null
@@ -138,7 +140,7 @@ export async function PUT(
         where: { id: params.id },
         data: {
           fornecedor: fabricante,
-          marca: fabricante,
+          marca: marca || reagenteExistente.marca || fabricante,
           quantidade: quantidade ?? reagenteExistente.quantidade,
           quantidadeAtual: quantidadeAtual ?? (quantidade ?? reagenteExistente.quantidadeAtual),
           unidade:

@@ -14,6 +14,7 @@ export default function EditReagentePage() {
   const [saving, setSaving] = useState(false);
 
   const [nome, setNome] = useState('');
+  const [marca, setMarca] = useState('');
   const [fabricante, setFabricante] = useState('');
   const [quantidade, setQuantidade] = useState('');
   const [quantidadeAtual, setQuantidadeAtual] = useState('');
@@ -35,6 +36,7 @@ export default function EditReagentePage() {
         if (data.success && data.reagente) {
           const r = data.reagente;
           setNome(r.nome || '');
+          setMarca(r.marca || '');
           setFabricante(r.fabricante || '');
           setQuantidade(r.quantidade?.toString() || '');
           setQuantidadeAtual(r.quantidadeAtual?.toString() || '');
@@ -66,8 +68,8 @@ export default function EditReagentePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!nome || !fabricante || !quantidade) {
-      alert('Please fill in all required fields');
+    if (!nome || !marca || !fabricante || !quantidade) {
+      alert('Please fill in all required fields (Name, Brand, Supplier, Quantity)');
       return;
     }
 
@@ -79,6 +81,7 @@ export default function EditReagentePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nome,
+          marca,
           fabricante,
           numeroNotaFiscal,
           quantidade: Number.parseFloat(quantidade),
@@ -134,12 +137,23 @@ export default function EditReagentePage() {
           </div>
 
           <div className="form-group">
+            <label>Brand *</label>
+            <input
+              type="text"
+              value={marca}
+              onChange={(e) => setMarca(e.target.value)}
+              placeholder="Ex: Sigma-Aldrich, Merck, Fisher"
+              required
+            />
+          </div>
+
+          <div className="form-group">
             <label>Supplier *</label>
             <input
               type="text"
               value={fabricante}
               onChange={(e) => setFabricante(e.target.value)}
-              placeholder="Ex: Sigma-Aldrich"
+              placeholder="Ex: Chemical Distributor Inc."
               required
             />
           </div>

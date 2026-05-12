@@ -13,6 +13,7 @@ type ReagenteEtiquetaPayload = {
   dataEntrada?: Date | string | null;
   fornecedor?: string | null;
   fabricante?: string | null;
+  marca?: string | null;
   notaFiscal?: string | null;
   responsavel?: string | null;
   perigos?: string | null;
@@ -179,7 +180,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
 
   // Rodapé
   const entrada = formatDate(payload.dataEntrada, "en-US");
-  const fornecedor = payload.fornecedor?.trim() || payload.fabricante?.trim() || "";
+  const marcaLabel = payload.marca?.trim() || payload.fornecedor?.trim() || payload.fabricante?.trim() || "";
 
   page.drawLine({
     start: { x: 15, y: 20 },
@@ -188,7 +189,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
     color: rgb(0.88, 0.9, 0.92),
   });
 
-  page.drawText(`Entry: ${entrada}    Supplier: ${fornecedor}`, {
+  page.drawText(`Entry: ${entrada}    Brand: ${marcaLabel}`, {
     x: 15,
     y: 12,
     size: 7,

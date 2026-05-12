@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
     const data = await request.json();
 
     const nome = String(data.nome ?? "").trim();
-    const fabricante = String(data.fabricante ?? data.marca ?? data.fornecedor ?? "").trim();
+    const marca = String(data.marca ?? "").trim();
+    const fabricante = String(data.fabricante ?? data.fornecedor ?? "").trim();
     const categoria = String(data.categoria ?? "").trim();
     const localizacao = String(data.localizacao ?? data.localidade ?? "").trim();
     const concentracao = String(data.concentracao ?? "").trim();
@@ -94,23 +95,25 @@ export async function POST(request: NextRequest) {
     const quantidade = Number.isFinite(quantidadeInformada) && quantidadeInformada > 0 ? quantidadeInformada : 0;
     const unidade = String(data.unidade ?? "L").trim() || "L";
     const quantidadeFrascosRaw = Number.parseInt(String(data.quantidadeFrascos ?? data.numeroFrascos ?? 1), 10);
-    const quantidadeFrascos = Number.isFinite(quantidadeFrascosRaw) && quantidadeFrascosRaw > 0 ? quantidadeFrascosRaw : 1;
+    const quantidadeFrascos = Number.isFinite(quantidadeFrascosRaw) && quantidadeFrascosRaw > 0
+      ? Math.min(quantidadeFrascosRaw, 10)
+      : 1;
 
-    if (!nome || !fabricante || !numeroNotaFiscal || quantidade <= 0) {
-      return NextResponse.json({ error: "Name, supplier, invoice number and quantity are required" }, { status: 400 });
+    if (!nome || !marca || !fabricante || !numeroNotaFiscal || quantidade <= 0) {
+      return NextResponse.json({ error: "Name, brand, supplier, invoice number and quantity are required" }, { status: 400 });
     }
 
     const dataEntrada = data.dataEntrada ? new Date(data.dataEntrada) : new Date();
     const dataValidade = validadeIndeterminada ? null : (data.dataValidade ? new Date(data.dataValidade) : null);
 
     const entradas = await prisma.$transaction(async (tx) => {
-      let reagente = await tx.reagente.findFirst({ where: { nome, marca: fabricante } });
+      let reagente = await tx.reagente.findFirst({ where: { nome, marca } });
 
       if (!reagente) {
         reagente = await tx.reagente.create({
           data: {
             nome,
-            marca: fabricante,
+            marca,
             localidade: localizacao || null,
             status: "ok",
           },
@@ -144,7 +147,7 @@ export async function POST(request: NextRequest) {
             quantidade,
             quantidadeAtual: quantidade,
             unidade,
-            marca: fabricante,
+            marca,
             codigoInterno,
             localizacao: localizacao || null,
             observacoes: null,
@@ -167,6 +170,7 @@ export async function POST(request: NextRequest) {
           dataValidade: entrada.dataValidade,
           dataEntrada: entrada.dataEntrada,
           fornecedor: entrada.fornecedor,
+          marca: entrada.marca,
           notaFiscal: entrada.notaFiscal,
           responsavel: entrada.responsavel,
           perigos: entrada.perigos,

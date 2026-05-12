@@ -296,6 +296,7 @@ function EntradaForm() {
 
   const [formData, setFormData] = useState({
     nome: '',
+    marca: '',
     fabricante: '',
     numeroNotaFiscal: '',
     quantidade: '',
@@ -319,6 +320,7 @@ function EntradaForm() {
   const resetForm = () => {
     setFormData({
       nome: '',
+      marca: '',
       fabricante: '',
       numeroNotaFiscal: '',
       quantidade: '',
@@ -343,6 +345,11 @@ function EntradaForm() {
       return;
     }
 
+    if (!formData.marca.trim()) {
+      setMessage('Brand is a required field.');
+      return;
+    }
+
     if (!formData.fabricante.trim()) {
       setMessage('Supplier is a required field.');
       return;
@@ -355,6 +362,11 @@ function EntradaForm() {
 
     if (!formData.quantidade || Number.parseFloat(formData.quantidade) <= 0) {
       setMessage('Quantity must be greater than zero.');
+      return;
+    }
+
+    if (formData.quantidadeFrascos < 1 || formData.quantidadeFrascos > 10) {
+      setMessage('Number of bottles must be between 1 and 10.');
       return;
     }
 
@@ -439,10 +451,21 @@ function EntradaForm() {
       </div>
 
       <div className="form-group">
+        <label>Brand *</label>
+        <input
+          type="text"
+          placeholder="Ex: Sigma-Aldrich, Merck, Fisher"
+          value={formData.marca}
+          onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+          required
+        />
+      </div>
+
+      <div className="form-group">
         <label>Supplier *</label>
         <input
           type="text"
-          placeholder="Ex: Sigma-Aldrich"
+          placeholder="Ex: Chemical Distributor Inc."
           value={formData.fabricante}
           onChange={(e) => setFormData({ ...formData, fabricante: e.target.value })}
           required
@@ -486,11 +509,23 @@ function EntradaForm() {
         <input
           type="number"
           min="1"
-          placeholder="Ex: 3"
+          max="10"
+          placeholder="Ex: 3 (max: 10)"
           value={formData.quantidadeFrascos}
-          onChange={(e) => setFormData({ ...formData, quantidadeFrascos: parseInt(e.target.value || '1', 10) })}
+          onChange={(e) => {
+            const val = parseInt(e.target.value || '1', 10);
+            if (val > 10) {
+              setMessage('Maximum 10 bottles per entry');
+              setFormData({ ...formData, quantidadeFrascos: 10 });
+            } else {
+              setFormData({ ...formData, quantidadeFrascos: val });
+            }
+          }}
           required
         />
+        <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+          You can register up to 10 bottles at once
+        </small>
       </div>
 
       <div className="form-group">
