@@ -117,10 +117,10 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
     maxWidth: nomeMaxWidth,
   });
 
-  y -= 20;
+  y -= 25;
 
-  // Caixa cinza com código interno
-  const boxY = y - 20;
+  // Caixa cinza com código interno (ajustada para não cortar a logo)
+  const boxY = Math.min(y - 5, 70);
   page.drawRectangle({
     x: 10,
     y: boxY,
@@ -197,7 +197,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
     maxWidth: pageWidth - 30,
   });
 
-  // Marca d'água EXPIRED
+  // Marca d'água EXPIRED (centralizada e mais transparente)
   if (expirado) {
     page.drawRectangle({
       x: 0,
@@ -205,21 +205,29 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
       width: pageWidth,
       height: pageHeight,
       color: rgb(0.85, 0.85, 0.85),
-      opacity: 0.3,
+      opacity: 0.2,
     });
 
     const expiredText = "EXPIRED";
     const expiredFontSize = 40;
     const textWidth = fontBold.widthOfTextAtSize(expiredText, expiredFontSize);
+    const textHeight = expiredFontSize;
+
+    // Centralização considerando rotação de -30 graus
+    const angleRad = (-30 * Math.PI) / 180;
+    const centerX = pageWidth / 2;
+    const centerY = pageHeight / 2;
+    const offsetX = (textWidth * Math.cos(angleRad) - textHeight * Math.sin(angleRad)) / 2;
+    const offsetY = (textWidth * Math.sin(angleRad) + textHeight * Math.cos(angleRad)) / 2;
 
     page.drawText(expiredText, {
-      x: (pageWidth - textWidth) / 2,
-      y: pageHeight / 2 - 10,
+      x: centerX - offsetX,
+      y: centerY - offsetY + 5,
       size: expiredFontSize,
       font: fontBold,
       color: rgb(0.9, 0, 0),
       rotate: degrees(-30),
-      opacity: 0.6,
+      opacity: 0.4,
     });
   }
 
