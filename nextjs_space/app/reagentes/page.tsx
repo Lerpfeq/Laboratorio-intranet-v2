@@ -2,32 +2,31 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import ReagenteLabelPreview from '@/components/ReagenteLabelPreview';
 import StorageLocationSelector from '@/components/StorageLocationSelector';
 
-interface Reagent {
+interface InventoryEntry {
   id: string;
+  reagenteId: string;
   nome: string;
   marca: string | null;
-  volume: string | null;
-  localidade: string | null;
-  status: string;
   entradas: {
     id: string;
     codigoInterno: string;
     dataValidade: string | null;
     localizacao: string | null;
     dataEntrada?: string;
+    categoria?: string | null;
+    concentracao?: string | null;
   }[];
 }
 
 export default function ReagentesPage() {
   const { data: session, status } = useSession() || {};
   const router = useRouter();
-  const [reagentes, setReagentes] = useState<Reagent[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('consulta');
   const [user, setUser] = useState<any>(null);
@@ -40,22 +39,16 @@ export default function ReagentesPage() {
 
   useEffect(() => {
     if (session?.user?.id) {
-      fetchUserAndReagentes();
+      fetchUser();
     }
   }, [session]);
 
-  const fetchUserAndReagentes = async () => {
+  const fetchUser = async () => {
     try {
       const userRes = await fetch('/api/auth/me');
       if (userRes.ok) {
         const userData = await userRes.json();
         setUser(userData);
-      }
-
-      const reagentesRes = await fetch('/api/reagentes');
-      if (reagentesRes.ok) {
-        const data = await reagentesRes.json();
-        setReagentes(data);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -113,39 +106,45 @@ export default function ReagentesPage() {
               onClick={() => setTab('saida')}
               style={{ padding: '0.75rem 1rem', background: tab === 'saida' ? '#3498db' : 'transparent', color: tab === 'saida' ? 'white' : '#333', border: 'none', cursor: 'pointer', borderRadius: '4px 4px 0 0' }}
             >
-              🗑️ Descarte de Reagente
+              🗑️ Reagent Disposal
             </button>
           </div>
         )}
 
         {tab === 'consulta' && <ConsultaReagentes userCategory={user?.category} />}
-        {tab === 'entrada' && (isPosGraduando || isAdmin) && <EntradaForm onSuccess={fetchUserAndReagentes} />}
-        {tab === 'saida' && (isPosGraduando || isAdmin) && (
-          <SaidaForm onSuccess={fetchUserAndReagentes} />
-        )}
+        {tab === 'entrada' && (isPosGraduando || isAdmin) && <EntradaForm />}
+        {tab === 'saida' && (isPosGraduando || isAdmin) && <SaidaForm />}
       </main>
     </div>
   );
 }
 
+function getStatus(dataValidade: string | null): 'Valid' | 'Expired' {
+  if (!dataValidade) return 'Valid';
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const validade = new Date(dataValidade);
+  validade.setHours(0, 0, 0, 0);
+  return validade >= hoje ? 'Valid' : 'Expired';
+}
+
 function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
-  const [reagentes, setReagentes] = useState<any[]>([]);
+  const [reagentes, setReagentes] = useState<InventoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filtros, setFiltros] = useState({ nome: '', marca: '' });
+
+  const [filtroNome, setFiltroNome] = useState('');
+  const [filtroMarca, setFiltroMarca] = useState('');
+  const [filtroLocalizacao, setFiltroLocalizacao] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState<'all' | 'valid' | 'expired'>('all');
 
   useEffect(() => {
     fetchReagentes();
   }, []);
 
-
-  const fetchReagentes = async (nome = '', marca = '') => {
+  const fetchReagentes = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (nome) params.append('nome', nome);
-      if (marca) params.append('marca', marca);
-
-      const res = await fetch(`/api/reagentes/consulta?${params.toString()}`);
+      const res = await fetch('/api/reagentes/consulta');
       if (res.ok) {
         const data = await res.json();
         setReagentes(data);
@@ -157,50 +156,67 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
     }
   };
 
-  const handleFilterChange = (field: string, value: string) => {
-    const novosFiltros = { ...filtros, [field]: value };
-    setFiltros(novosFiltros);
-    fetchReagentes(novosFiltros.nome, novosFiltros.marca);
-  };
+  const reagentesFiltrados = useMemo(() => {
+    return reagentes.filter((r) => {
+      const entrada = r.entradas[0];
+      const location = entrada?.localizacao || '';
+      const status = getStatus(entrada?.dataValidade || null);
+
+      const matchNome = !filtroNome || r.nome.toLowerCase().includes(filtroNome.toLowerCase());
+      const matchMarca = !filtroMarca || (r.marca || '').toLowerCase().includes(filtroMarca.toLowerCase());
+      const matchLocalizacao = !filtroLocalizacao || location.toLowerCase().includes(filtroLocalizacao.toLowerCase());
+      const matchStatus =
+        filtroStatus === 'all' ||
+        (filtroStatus === 'valid' && status === 'Valid') ||
+        (filtroStatus === 'expired' && status === 'Expired');
+
+      return matchNome && matchMarca && matchLocalizacao && matchStatus;
+    });
+  }, [reagentes, filtroNome, filtroMarca, filtroLocalizacao, filtroStatus]);
 
   return (
     <div>
       <h3 style={{ marginBottom: '1.5rem' }}>🔍 Check Inventory</h3>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '1rem',
-          marginBottom: '1.5rem',
-          padding: '1rem',
-          backgroundColor: '#ecf0f1',
-          borderRadius: '4px',
-        }}
-      >
-        <div className="form-group" style={{ margin: 0 }}>
-          <label>Filter by Name</label>
-          <input
-            type="text"
-            value={filtros.nome}
-            onChange={(e) => handleFilterChange('nome', e.target.value)}
-            placeholder="Enter the reagent's name"
-          />
-        </div>
-        <div className="form-group" style={{ margin: 0 }}>
-          <label>Filter by Brand</label>
-          <input
-            type="text"
-            value={filtros.marca}
-            onChange={(e) => handleFilterChange('marca', e.target.value)}
-            placeholder="Enter the brand"
-          />
-        </div>
+      <div className="filters-container">
+        <input
+          type="text"
+          placeholder="Filter by name..."
+          value={filtroNome}
+          onChange={(e) => setFiltroNome(e.target.value)}
+          className="filter-input"
+        />
+
+        <input
+          type="text"
+          placeholder="Filter by brand..."
+          value={filtroMarca}
+          onChange={(e) => setFiltroMarca(e.target.value)}
+          className="filter-input"
+        />
+
+        <input
+          type="text"
+          placeholder="Filter by location..."
+          value={filtroLocalizacao}
+          onChange={(e) => setFiltroLocalizacao(e.target.value)}
+          className="filter-input"
+        />
+
+        <select
+          value={filtroStatus}
+          onChange={(e) => setFiltroStatus(e.target.value as 'all' | 'valid' | 'expired')}
+          className="filter-select"
+        >
+          <option value="all">All Status</option>
+          <option value="valid">Valid Only</option>
+          <option value="expired">Expired Only</option>
+        </select>
       </div>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>
-      ) : reagentes.length === 0 ? (
+      ) : reagentesFiltrados.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '2rem', color: '#7f8c8d' }}>No results found</div>
       ) : (
         <table className="table">
@@ -214,28 +230,29 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
               <th>Location</th>
               <th>Expiry Date</th>
               <th>Status</th>
-              <th>Ações</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {reagentes.map((r) => {
-              const ultimaEntrada = r.entradas[0];
+            {reagentesFiltrados.map((r) => {
+              const entrada = r.entradas[0];
+              const status = getStatus(entrada?.dataValidade || null);
               return (
                 <tr key={r.id}>
                   <td><strong>{r.nome}</strong></td>
                   <td>{r.marca || '-'}</td>
-                  <td><code>{ultimaEntrada?.codigoInterno || '-'}</code></td>
-                  <td>{ultimaEntrada?.categoria || '-'}</td>
-                  <td>{ultimaEntrada?.concentracao || '-'}</td>
-                  <td>{ultimaEntrada?.localizacao || '-'}</td>
+                  <td><code>{entrada?.codigoInterno || '-'}</code></td>
+                  <td>{entrada?.categoria || '-'}</td>
+                  <td>{entrada?.concentracao || '-'}</td>
+                  <td>{entrada?.localizacao || '-'}</td>
+                  <td>{entrada?.dataValidade ? new Date(entrada.dataValidade).toLocaleDateString('en-US') : '-'}</td>
                   <td>
-                    {ultimaEntrada?.dataValidade
-                      ? new Date(ultimaEntrada.dataValidade).toLocaleDateString('en-US')
-                      : '-'}
+                    <span className={`status-badge ${status.toLowerCase()}`}>
+                      {status}
+                    </span>
                   </td>
-                  <td><span className={`status-badge status-${r.status}`}>{r.status}</span></td>
                   <td>
-                    {userCategory === 'IC' || !ultimaEntrada?.codigoInterno ? (
+                    {userCategory === 'IC' || !entrada?.id ? (
                       <button
                         disabled
                         className="button"
@@ -249,13 +266,13 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
                           fontSize: '12px',
                           fontWeight: 600,
                         }}
-                        title="Perfil IC sem permissão para reemitir etiqueta"
+                        title="IC profile does not have permission to reissue label"
                         type="button"
                       >
-                        📄 Reemitir Etiqueta
+                        📄 Reissue Label
                       </button>
                     ) : (
-                      <Link href={`/reagentes/reemitir/${r.id}`}>
+                      <Link href={`/reagentes/reemitir/${entrada.id}`}>
                         <button
                           className="button"
                           style={{
@@ -268,10 +285,10 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
                             fontSize: '12px',
                             fontWeight: 600,
                           }}
-                          title="Abrir tela de reemissão"
+                          title="Open label reissue page"
                           type="button"
                         >
-                          📄 Reemitir Etiqueta
+                          📄 Reissue Label
                         </button>
                       </Link>
                     )}
@@ -286,42 +303,43 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
   );
 }
 
-function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
+function EntradaForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [reagenteCadastrado, setReagenteCadastrado] = useState<{ id: string; codigo: string } | null>(null);
+
   const [formData, setFormData] = useState({
     nome: '',
-    marca: '',
-    volume: '',
-    localidade: '',
-    fornecedor: '',
-    notaFiscal: '',
-    quantidade: 1,
-    dataEntrada: new Date().toISOString().split('T')[0],
-    categoria: '',
-    concentracao: '',
+    fabricante: '',
+    quantidade: '',
+    unidade: 'L',
+    quantidadeFrascos: 1,
     dataValidade: '',
-    perigos: '',
+    lote: '',
+    cas: '',
+    categoria: '',
+    localizacao: '',
+    concentracao: '',
     responsavel: '',
+    perigos: '',
   });
 
   const resetForm = () => {
     setFormData({
       nome: '',
-      marca: '',
-      volume: '',
-      localidade: '',
-      fornecedor: '',
-      notaFiscal: '',
-      quantidade: 1,
-      dataEntrada: new Date().toISOString().split('T')[0],
-      categoria: '',
-      concentracao: '',
+      fabricante: '',
+      quantidade: '',
+      unidade: 'L',
+      quantidadeFrascos: 1,
       dataValidade: '',
-      perigos: '',
+      lote: '',
+      cas: '',
+      categoria: '',
+      localizacao: '',
+      concentracao: '',
       responsavel: '',
+      perigos: '',
     });
   };
 
@@ -331,10 +349,16 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
     setMessage('');
 
     try {
+      const payload = {
+        ...formData,
+        quantidade: Number.parseFloat(formData.quantidade),
+        dataEntrada: new Date().toISOString(),
+      };
+
       const res = await fetch('/api/reagentes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -347,10 +371,10 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
           });
           setShowPreview(true);
           setMessage(`Reagent successfully added! ${data.length} label${data.length > 1 ? 's' : ''} generated.`);
-          onSuccess();
         }
       } else {
-        setMessage('Error adding reagent.');
+        const data = await res.json().catch(() => ({}));
+        setMessage(data.error || 'Error adding reagent.');
       }
     } catch (error) {
       setMessage('Error adding reagent.');
@@ -379,168 +403,142 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
         <label>Reagent Name *</label>
         <input
           type="text"
+          placeholder="Ex: Acetone"
           value={formData.nome}
           onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
           required
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <div className="form-group">
-          <label>Brand</label>
-          <input
-            type="text"
-            value={formData.marca}
-            onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label>Category</label>
-          <select
-            value={formData.categoria}
-            onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-          >
-            <option value="">Select a category</option>
-            <option value="Solvent">Solvent</option>
-            <option value="Acid">Acid</option>
-            <option value="Base">Base</option>
-            <option value="Monomer">Monomer</option>
-            <option value="Polymer">Polymer</option>
-            <option value="Crosslinker">Crosslinker</option>
-            <option value="Catalyst">Catalyst</option>
-            <option value="Photoinitiator">Photoinitiator</option>
-            <option value="Nanomaterial">Nanomaterial</option>
-            <option value="Analytical">Analytical</option>
-            <option value="Microbiology">Microbiology</option>
-            <option value="Inorganic Salt">Inorganic Salt</option>
-            <option value="Thiol">Thiol</option>
-          </select>
-        </div>
+      <div className="form-group">
+        <label>Brand/Supplier *</label>
+        <input
+          type="text"
+          placeholder="Ex: Sigma-Aldrich"
+          value={formData.fabricante}
+          onChange={(e) => setFormData({ ...formData, fabricante: e.target.value })}
+          required
+        />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <div className="form-group">
-          <label>Volume</label>
-          <input
-            type="text"
-            value={formData.volume}
-            onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
-            placeholder="e.g. 1L, 500ml"
-          />
-        </div>
-        <div className="form-group">
-          <label>Concentration (e.g. 99.5%)</label>
-          <input
-            type="text"
-            value={formData.concentracao}
-            onChange={(e) => setFormData({ ...formData, concentracao: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <StorageLocationSelector
-        value={formData.localidade}
-        onChange={(location) => setFormData({ ...formData, localidade: location })}
-      />
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <div className="form-group">
-          <label>Expiry Date</label>
-          <input
-            type="date"
-            value={formData.dataValidade}
-            onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label>Supplier *</label>
-          <input
-            type="text"
-            value={formData.fornecedor}
-            onChange={(e) => setFormData({ ...formData, fornecedor: e.target.value })}
-            required
-          />
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <div className="form-group">
-          <label>Invoice Number</label>
-          <input
-            type="text"
-            value={formData.notaFiscal}
-            onChange={(e) => setFormData({ ...formData, notaFiscal: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label>Hazard Class</label>
-          <select
-            value={formData.perigos}
-            onChange={(e) => setFormData({ ...formData, perigos: e.target.value })}
-          >
-            <option value="">Select a category</option>
-            <option value="Flammable">Flammable</option>
-            <option value="Controlled">Controlled</option>
-            <option value="Refrigerated">Refrigerated</option>
-            <option value="Corrosive">Corrosive</option>
-            <option value="Oxidizer">Oxidizer</option>
-            <option value="Inert">Inert</option>
-          </select>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <div className="form-group">
-          <label>Quantity *</label>
+      <div className="form-group">
+        <label>Quantity *</label>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <input
             type="number"
+            step="0.001"
+            placeholder="Ex: 1.5"
             value={formData.quantidade}
-            onChange={(e) => setFormData({ ...formData, quantidade: parseInt(e.target.value) })}
-            min="1"
+            onChange={(e) => setFormData({ ...formData, quantidade: e.target.value })}
             required
           />
-        </div>
-        <div className="form-group">
-          <label>Responsible</label>
-          <input
-            type="text"
-            value={formData.responsavel}
-            onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
-          />
+          <select value={formData.unidade} onChange={(e) => setFormData({ ...formData, unidade: e.target.value })}>
+            <option value="L">L (Liters)</option>
+            <option value="mL">mL (Milliliters)</option>
+            <option value="kg">kg (Kilograms)</option>
+            <option value="g">g (Grams)</option>
+            <option value="mg">mg (Milligrams)</option>
+          </select>
         </div>
       </div>
 
       <div className="form-group">
-        <label>Entry Date</label>
+        <label>Number of Bottles *</label>
+        <input
+          type="number"
+          min="1"
+          placeholder="Ex: 3"
+          value={formData.quantidadeFrascos}
+          onChange={(e) => setFormData({ ...formData, quantidadeFrascos: parseInt(e.target.value || '1', 10) })}
+          required
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Expiry Date</label>
         <input
           type="date"
-          value={formData.dataEntrada}
-          onChange={(e) => setFormData({ ...formData, dataEntrada: e.target.value })}
+          value={formData.dataValidade}
+          onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Batch/Lot</label>
+        <input
+          type="text"
+          placeholder="Ex: LOT12345"
+          value={formData.lote}
+          onChange={(e) => setFormData({ ...formData, lote: e.target.value })}
+        />
+      </div>
+
+      <div className="form-group">
+        <label>CAS Number</label>
+        <input
+          type="text"
+          placeholder="Ex: 67-64-1"
+          value={formData.cas}
+          onChange={(e) => setFormData({ ...formData, cas: e.target.value })}
+        />
+      </div>
+
+      <StorageLocationSelector
+        value={formData.localizacao}
+        onChange={(location) => setFormData({ ...formData, localizacao: location })}
+        onCategoryChange={(category) => setFormData((prev) => ({ ...prev, categoria: category }))}
+      />
+
+      <div className="form-group">
+        <label>Concentration</label>
+        <input
+          type="text"
+          placeholder="Ex: 99.5%"
+          value={formData.concentracao}
+          onChange={(e) => setFormData({ ...formData, concentracao: e.target.value })}
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Hazard Class</label>
+        <select value={formData.perigos} onChange={(e) => setFormData({ ...formData, perigos: e.target.value })}>
+          <option value="">Select hazard class...</option>
+          <option value="Flammable">Flammable</option>
+          <option value="Controlled">Controlled</option>
+          <option value="Refrigerated">Refrigerated</option>
+          <option value="Corrosive">Corrosive</option>
+          <option value="Oxidizer">Oxidizer</option>
+          <option value="Inert">Inert</option>
+        </select>
+      </div>
+
+      <div className="form-group">
+        <label>Responsible</label>
+        <input
+          type="text"
+          value={formData.responsavel}
+          onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
+          placeholder="Name of responsible person"
         />
       </div>
 
       <button type="submit" disabled={loading} className="button button-primary">
-        {loading ? 'Processing...' : '🏷️ Generate Label & Register'}
+        {loading ? 'Processing...' : 'Register Reagent'}
       </button>
 
-      {message && (
-        <div className={message.includes('successfully') ? 'success-message' : 'error-message'}>
-          {message}
-        </div>
-      )}
+      {message && <div className={message.toLowerCase().includes('success') ? 'success-message' : 'error-message'}>{message}</div>}
     </form>
   );
 }
 
-function SaidaForm({ onSuccess }: { onSuccess: () => void }) {
-  const { data: session } = useSession();
+function SaidaForm() {
   const [codigo, setCodigo] = useState('');
   const [reagente, setReagente] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const buscarPorCodigo = async () => {
     if (!codigo.trim()) {
-      alert('Digite o código interno');
+      alert('Type the internal code.');
       return;
     }
 
@@ -552,12 +550,12 @@ function SaidaForm({ onSuccess }: { onSuccess: () => void }) {
       if (data.success) {
         setReagente(data.reagente);
       } else {
-        alert('Reagente não encontrado');
+        alert('Reagent not found.');
         setReagente(null);
       }
     } catch (error) {
-      console.error('Erro ao buscar reagente:', error);
-      alert('Erro ao buscar reagente');
+      console.error('Error searching reagent:', error);
+      alert('Error searching reagent.');
     } finally {
       setLoading(false);
     }
@@ -565,17 +563,15 @@ function SaidaForm({ onSuccess }: { onSuccess: () => void }) {
 
   const registrarDescarte = async () => {
     if (!reagente) {
-      alert('Busque um reagente primeiro');
+      alert('Search for a reagent first.');
       return;
     }
 
     const confirmar = window.confirm(
-      `Tem certeza que deseja registrar o descarte/fim do frasco ${reagente.codigo}?\n\nEsta ação é IRREVERSÍVEL e o registro será DELETADO permanentemente do banco de dados.`
+      `Are you sure you want to register disposal for bottle ${reagente.codigo}?\n\nThis action is IRREVERSIBLE and the bottle will be permanently deleted from the database.`
     );
 
-    if (!confirmar) {
-      return;
-    }
+    if (!confirmar) return;
 
     try {
       setLoading(true);
@@ -586,23 +582,21 @@ function SaidaForm({ onSuccess }: { onSuccess: () => void }) {
         body: JSON.stringify({
           reagenteId: reagente.id,
           codigo: reagente.codigo,
-          responsavel: session?.user?.name,
         }),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        alert('Frasco descartado e removido do inventário com sucesso!');
+        alert('Bottle deleted successfully!');
         setCodigo('');
         setReagente(null);
-        onSuccess();
       } else {
-        alert(`Erro: ${data.error || 'Erro ao registrar descarte'}`);
+        alert(`Error: ${data.error || 'Error deleting bottle.'}`);
       }
     } catch (error) {
-      console.error('Erro ao registrar descarte:', error);
-      alert('Erro ao registrar descarte');
+      console.error('Error deleting bottle:', error);
+      alert('Error deleting bottle.');
     } finally {
       setLoading(false);
     }
@@ -610,10 +604,8 @@ function SaidaForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-      <h3>Descarte de Reagente</h3>
-      <p style={{ marginBottom: '1rem' }}>
-        Registre quando um frasco acabou (será removido do inventário).
-      </p>
+      <h3>Reagent Disposal</h3>
+      <p style={{ marginBottom: '1rem' }}>Register when a bottle is finished (will be removed from inventory)</p>
 
       <div className="form-group">
         <label>Internal Code:</label>
@@ -631,39 +623,28 @@ function SaidaForm({ onSuccess }: { onSuccess: () => void }) {
             }}
           />
           <button type="button" onClick={buscarPorCodigo} disabled={loading} className="button button-primary">
-            🔍 Buscar
+            🔍 Search
           </button>
         </div>
       </div>
 
       {reagente && (
-        <div
-          className="card"
-          style={{ backgroundColor: '#fff3cd', border: '2px solid #ffc107', padding: '1rem', borderRadius: '8px' }}
-        >
-          <h3>⚠️ Reagente Encontrado:</h3>
-          <p><strong>Código:</strong> {reagente.codigo}</p>
-          <p><strong>Nome:</strong> {reagente.nome}</p>
-          <p><strong>Fabricante:</strong> {reagente.fabricante || '-'}</p>
-          <p><strong>Localização:</strong> {reagente.localizacao || '-'}</p>
-          <p>
-            <strong>Data de entrada:</strong>{' '}
-            {reagente.dataEntrada ? new Date(reagente.dataEntrada).toLocaleDateString('pt-BR') : '-'}
-          </p>
+        <div className="card" style={{ backgroundColor: '#fff3cd', border: '2px solid #ffc107', padding: '1rem', borderRadius: '8px' }}>
+          <h3>⚠️ Reagent Found:</h3>
+          <p><strong>Code:</strong> {reagente.codigo}</p>
+          <p><strong>Name:</strong> {reagente.nome}</p>
+          <p><strong>Brand:</strong> {reagente.fabricante || '-'}</p>
+          <p><strong>Location:</strong> {reagente.localizacao || '-'}</p>
+          <p><strong>Entry date:</strong> {reagente.dataEntrada ? new Date(reagente.dataEntrada).toLocaleDateString('en-US') : '-'}</p>
 
           <hr />
 
           <p style={{ color: '#d32f2f', fontWeight: 'bold' }}>
-            ⚠️ ATENÇÃO: Ao confirmar, este frasco será DELETADO PERMANENTEMENTE do banco de dados.
+            ⚠️ WARNING: By confirming, this bottle will be PERMANENTLY DELETED from the database.
           </p>
 
-          <button
-            type="button"
-            onClick={registrarDescarte}
-            disabled={loading}
-            className="button button-danger"
-          >
-            🗑️ Registrar Descarte (Deletar Frasco)
+          <button type="button" onClick={registrarDescarte} disabled={loading} className="button button-danger">
+            🗑️ Register Disposal (Delete Bottle)
           </button>
         </div>
       )}

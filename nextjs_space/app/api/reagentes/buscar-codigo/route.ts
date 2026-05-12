@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const codigo = codigoRaw?.trim().toUpperCase();
 
     if (!codigo) {
-      return NextResponse.json({ error: "Código não fornecido" }, { status: 400 });
+      return NextResponse.json({ error: "Internal code is required" }, { status: 400 });
     }
 
     const reagenteEntrada = await prisma.reagenteEntrada.findUnique({
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!reagenteEntrada?.reagente) {
-      return NextResponse.json({ success: false, error: "Reagente não encontrado" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Reagent not found" }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -47,13 +47,15 @@ export async function GET(request: NextRequest) {
         nome: reagenteEntrada.reagente.nome,
         fabricante: reagenteEntrada.marca || reagenteEntrada.reagente.marca || "-",
         localizacao: reagenteEntrada.localizacao || "-",
-        volume: reagenteEntrada.volume,
+        quantidade: reagenteEntrada.quantidade,
+        quantidadeAtual: reagenteEntrada.quantidadeAtual,
+        unidade: reagenteEntrada.unidade,
         dataEntrada: reagenteEntrada.dataEntrada,
         dataValidade: reagenteEntrada.dataValidade,
       },
     });
   } catch (error) {
-    console.error("Erro ao buscar reagente:", error);
-    return NextResponse.json({ error: "Erro ao buscar reagente" }, { status: 500 });
+    console.error("Error finding reagent:", error);
+    return NextResponse.json({ error: "Error finding reagent" }, { status: 500 });
   }
 }

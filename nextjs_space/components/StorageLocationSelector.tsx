@@ -6,9 +6,10 @@ import { storageLocations, getClassesByCategory, getLocationsByCategory } from '
 interface Props {
   value: string;
   onChange: (location: string) => void;
+  onCategoryChange?: (category: string) => void;
 }
 
-export default function StorageLocationSelector({ value, onChange }: Props) {
+export default function StorageLocationSelector({ value, onChange, onCategoryChange }: Props) {
   const [category, setCategory] = useState('');
   const [storageClass, setStorageClass] = useState('');
   const [availableClasses, setAvailableClasses] = useState<string[]>([]);
@@ -19,6 +20,7 @@ export default function StorageLocationSelector({ value, onChange }: Props) {
       setAvailableClasses([]);
       setAvailableLocations([]);
       setStorageClass('');
+      onCategoryChange?.('');
       return;
     }
 
@@ -27,7 +29,8 @@ export default function StorageLocationSelector({ value, onChange }: Props) {
     setAvailableClasses(classes);
     setAvailableLocations(locations);
     setStorageClass('');
-  }, [category]);
+    onCategoryChange?.(category);
+  }, [category, onCategoryChange]);
 
   const handleLocationSelect = (location: string) => {
     onChange(location);

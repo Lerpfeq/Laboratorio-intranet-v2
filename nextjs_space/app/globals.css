@@ -220,3 +220,38 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
   background: #e8f5e9;
   border-left: 4px solid #4caf50;
 }
+
+
+.filters-container {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-input,
+.filter-select {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.status-badge {
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.85em;
+  text-transform: uppercase;
+}
+
+.status-badge.valid {
+  background-color: #4caf50;
+  color: white;
+}
+
+.status-badge.expired {
+  background-color: #f44336;
+  color: white;
+}

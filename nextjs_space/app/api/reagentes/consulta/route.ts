@@ -9,42 +9,29 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const nome = searchParams.get("nome") || "";
     const marca = searchParams.get("marca") || "";
-    const status = searchParams.get("status") || "";
 
     const where: any = {};
 
     if (nome) {
-      where.nome = {
-        contains: nome,
-        mode: "insensitive",
-      };
+      where.nome = { contains: nome, mode: "insensitive" };
     }
 
     if (marca) {
-      where.marca = {
-        contains: marca,
-        mode: "insensitive",
-      };
+      where.marca = { contains: marca, mode: "insensitive" };
     }
 
-    if (status) {
-      where.status = status;
-    }
-
-    // Inventário precisa listar cada frasco individualmente (uma linha por ReagenteEntrada)
     const reagentesBase = await prisma.reagente.findMany({
       where,
       select: {
         id: true,
         nome: true,
         marca: true,
-        volume: true,
         localidade: true,
         status: true,
         ultimaAtualizacao: true,
@@ -58,6 +45,8 @@ export async function GET(request: NextRequest) {
             concentracao: true,
             localizacao: true,
             quantidade: true,
+            quantidadeAtual: true,
+            unidade: true,
             responsavel: true,
           },
           orderBy: { dataEntrada: "desc" },
@@ -68,19 +57,7 @@ export async function GET(request: NextRequest) {
 
     const reagentes = reagentesBase.flatMap((reagente) => {
       if (reagente.entradas.length === 0) {
-        return [
-          {
-            id: reagente.id,
-            reagenteId: reagente.id,
-            nome: reagente.nome,
-            marca: reagente.marca,
-            volume: reagente.volume,
-            localidade: reagente.localidade,
-            status: reagente.status,
-            ultimaAtualizacao: reagente.ultimaAtualizacao,
-            entradas: [],
-          },
-        ];
+        return [];
       }
 
       return reagente.entradas.map((entrada) => ({
@@ -88,7 +65,6 @@ export async function GET(request: NextRequest) {
         reagenteId: reagente.id,
         nome: reagente.nome,
         marca: reagente.marca,
-        volume: reagente.volume,
         localidade: reagente.localidade,
         status: reagente.status,
         ultimaAtualizacao: reagente.ultimaAtualizacao,
@@ -99,9 +75,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(reagentes);
   } catch (error: any) {
     console.error("Consulta error:", error);
-    return NextResponse.json(
-      { error: error?.message || "Erro ao buscar reagentes" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error?.message || "Error fetching reagents" }, { status: 500 });
   }
 }

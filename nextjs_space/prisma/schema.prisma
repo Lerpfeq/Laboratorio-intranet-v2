@@ -139,9 +139,10 @@ model ReagenteEntrada {
   dataEntrada     DateTime
   fornecedor      String
   notaFiscal      String?
-  volume          String?
+  quantidade      Float
+  quantidadeAtual Float?
+  unidade         String   @default("L")
   marca           String?
-  quantidade      Int
   codigoInterno   String   @unique
   codigoQR        String?  @db.Text
   localizacao     String?

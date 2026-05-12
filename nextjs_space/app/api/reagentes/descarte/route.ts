@@ -10,12 +10,12 @@ export async function DELETE(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (user?.category === "IC") {
-      return NextResponse.json({ error: "Permissão negada" }, { status: 403 });
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     const data = await request.json();
@@ -23,42 +23,57 @@ export async function DELETE(request: NextRequest) {
     const codigo = typeof data.codigo === "string" ? data.codigo : "";
 
     if (!reagenteId) {
-      return NextResponse.json({ error: "ID do reagente não informado" }, { status: 400 });
+      return NextResponse.json({ error: "Missing reagent bottle id" }, { status: 400 });
     }
 
     const reagente = await prisma.reagenteEntrada.findUnique({
       where: { id: reagenteId },
-      select: { id: true, reagenteId: true, codigoInterno: true },
+      include: {
+        reagente: {
+          select: {
+            id: true,
+            nome: true,
+            marca: true,
+          },
+        },
+      },
     });
 
-    if (!reagente) {
-      return NextResponse.json({ error: "Reagente não encontrado" }, { status: 404 });
+    if (!reagente?.reagente) {
+      return NextResponse.json({ error: "Reagent not found" }, { status: 404 });
     }
 
-    await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.reagenteEntrada.delete({ where: { id: reagenteId } });
 
-      const entradasRestantes = await tx.reagenteEntrada.count({
+      const outrosFrascos = await tx.reagenteEntrada.findFirst({
         where: { reagenteId: reagente.reagenteId },
       });
 
-      await tx.reagente.update({
-        where: { id: reagente.reagenteId },
-        data: {
-          status: entradasRestantes > 0 ? "ok" : "esgotado",
-          ultimaAtualizacao: new Date(),
-        },
-      });
+      if (!outrosFrascos) {
+        await tx.reagente.delete({ where: { id: reagente.reagenteId } });
+      } else {
+        await tx.reagente.update({
+          where: { id: reagente.reagenteId },
+          data: { status: "ok", ultimaAtualizacao: new Date() },
+        });
+      }
+
+      return { wasLastBottle: !outrosFrascos };
     });
 
-    console.log(`Reagente ${codigo || reagente.codigoInterno} deletado por ${session.user.name || session.user.id}`);
+    console.log(`Bottle ${codigo || reagente.codigoInterno} deleted by ${session.user.name || session.user.id}`);
+    if (result.wasLastBottle) {
+      console.log(`Last bottle of ${reagente.reagente.nome} removed from database`);
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Reagente deletado com sucesso",
+      message: "Reagent bottle deleted successfully",
+      wasLastBottle: result.wasLastBottle,
     });
   } catch (error) {
-    console.error("Erro ao deletar reagente:", error);
-    return NextResponse.json({ error: "Erro ao deletar reagente" }, { status: 500 });
+    console.error("Error deleting reagent:", error);
+    return NextResponse.json({ error: "Error deleting reagent" }, { status: 500 });
   }
 }
