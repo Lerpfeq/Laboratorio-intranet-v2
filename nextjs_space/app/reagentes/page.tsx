@@ -337,6 +337,27 @@ function EntradaForm() {
     e.preventDefault();
     setMessage('');
 
+    // Validate required fields
+    if (!formData.nome.trim()) {
+      setMessage('Reagent Name is a required field.');
+      return;
+    }
+
+    if (!formData.fabricante.trim()) {
+      setMessage('Supplier is a required field.');
+      return;
+    }
+
+    if (!formData.numeroNotaFiscal.trim()) {
+      setMessage('Invoice Number is a required field.');
+      return;
+    }
+
+    if (!formData.quantidade || Number.parseFloat(formData.quantidade) <= 0) {
+      setMessage('Quantity must be greater than zero.');
+      return;
+    }
+
     // Validate Expiry Date (required unless indeterminate)
     if (!formData.validadeIndeterminada && !formData.dataValidade) {
       setMessage('Please select an Expiry Date or mark as Indeterminate.');
@@ -345,7 +366,7 @@ function EntradaForm() {
 
     // Validate Responsible (required)
     if (!formData.responsavel.trim()) {
-      setMessage('Responsible is a required field.');
+      setMessage('Responsible is a required field. Please log in again if not filled automatically.');
       return;
     }
 
@@ -359,25 +380,32 @@ function EntradaForm() {
         dataValidade: formData.validadeIndeterminada ? null : (formData.dataValidade || null),
       };
 
+      console.log('[EntradaForm] Sending payload:', JSON.stringify(payload, null, 2));
+
       const res = await fetch('/api/reagentes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setReagentesCriados(data);
-          setShowPreview(true);
-          setMessage(`Reagent successfully added! ${data.length} label${data.length > 1 ? 's' : ''} generated.`);
-        }
+      const data = await res.json();
+      console.log('[EntradaForm] API response status:', res.status, 'data:', data);
+
+      if (res.ok && Array.isArray(data) && data.length > 0) {
+        setReagentesCriados(data);
+        setShowPreview(true);
+        setMessage(`Reagent successfully added! ${data.length} label${data.length > 1 ? 's' : ''} generated.`);
+      } else if (res.ok && data && !Array.isArray(data)) {
+        // Handle legacy single-object response
+        setReagentesCriados([data]);
+        setShowPreview(true);
+        setMessage('Reagent successfully added! 1 label generated.');
       } else {
-        const data = await res.json().catch(() => ({}));
-        setMessage(data.error || 'Error adding reagent.');
+        setMessage(data?.error || `Error adding reagent (status ${res.status}).`);
       }
-    } catch (error) {
-      setMessage('Error adding reagent.');
+    } catch (error: any) {
+      console.error('[EntradaForm] Error:', error);
+      setMessage('Network error adding reagent: ' + (error?.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -517,16 +545,14 @@ function EntradaForm() {
         <input
           type="text"
           value={formData.responsavel}
-          onChange={(e) => setFormData({ ...formData, responsavel: e.target.value })}
+          readOnly
           placeholder="Name of responsible person"
           required
-          style={{ backgroundColor: session?.user?.name ? '#f5f5f5' : undefined }}
+          style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
         />
-        {session?.user?.name && (
-          <small style={{ color: '#666', fontSize: '12px' }}>
-            Automatically filled from your user session
-          </small>
-        )}
+        <small style={{ color: '#666', fontSize: '12px' }}>
+          Automatically filled from your login session
+        </small>
       </div>
 
       <button type="submit" disabled={loading} className="button button-primary">
