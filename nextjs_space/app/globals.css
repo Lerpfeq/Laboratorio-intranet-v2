@@ -214,11 +214,22 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
   opacity: 0.8;
 }
 
-.selected-location {
+.storage-location-result {
   margin-top: 15px;
-  padding: 10px;
-  background: #e8f5e9;
+  padding: 15px;
+  background-color: #e8f5e9;
   border-left: 4px solid #4caf50;
+  border-radius: 4px;
+}
+
+.location-badge {
+  margin-top: 8px;
+  padding: 10px;
+  background-color: #2196f3;
+  color: white;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.95em;
 }
 
 

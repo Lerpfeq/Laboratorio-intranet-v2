@@ -218,21 +218,12 @@ export default function EditReagentePage() {
         </div>
 
         <div className="form-group" style={{ marginTop: '20px' }}>
-          <label>Category and Storage Location</label>
           <StorageLocationSelector
-            value={localizacao}
-            onChange={setLocalizacao}
-            onCategoryChange={(nextCategory) => {
-              if (nextCategory) {
-                setCategoria(nextCategory);
-              }
-            }}
+            category={categoria}
+            onCategoryChange={setCategoria}
+            location={localizacao}
+            onLocationChange={setLocalizacao}
           />
-          {categoria && (
-            <small style={{ color: '#666' }}>
-              Selected category: <strong>{categoria}</strong>
-            </small>
-          )}
         </div>
 
         <div className="form-actions">

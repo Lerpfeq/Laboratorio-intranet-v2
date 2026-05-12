@@ -306,7 +306,6 @@ function EntradaForm() {
     localizacao: '',
     concentracao: '',
     responsavel: '',
-    perigos: '',
   });
 
   const resetForm = () => {
@@ -323,7 +322,6 @@ function EntradaForm() {
       localizacao: '',
       concentracao: '',
       responsavel: '',
-      perigos: '',
     });
   };
 
@@ -467,11 +465,14 @@ function EntradaForm() {
         />
       </div>
 
-      <StorageLocationSelector
-        value={formData.localizacao}
-        onChange={(location) => setFormData({ ...formData, localizacao: location })}
-        onCategoryChange={(category) => setFormData((prev) => ({ ...prev, categoria: category }))}
-      />
+      <div className="form-group">
+        <StorageLocationSelector
+          category={formData.categoria}
+          onCategoryChange={(category) => setFormData((prev) => ({ ...prev, categoria: category }))}
+          location={formData.localizacao}
+          onLocationChange={(location) => setFormData((prev) => ({ ...prev, localizacao: location }))}
+        />
+      </div>
 
       <div className="form-group">
         <label>Concentration</label>
@@ -483,18 +484,6 @@ function EntradaForm() {
         />
       </div>
 
-      <div className="form-group">
-        <label>Hazard Class</label>
-        <select value={formData.perigos} onChange={(e) => setFormData({ ...formData, perigos: e.target.value })}>
-          <option value="">Select hazard class...</option>
-          <option value="Flammable">Flammable</option>
-          <option value="Controlled">Controlled</option>
-          <option value="Refrigerated">Refrigerated</option>
-          <option value="Corrosive">Corrosive</option>
-          <option value="Oxidizer">Oxidizer</option>
-          <option value="Inert">Inert</option>
-        </select>
-      </div>
 
       <div className="form-group">
         <label>Responsible</label>
