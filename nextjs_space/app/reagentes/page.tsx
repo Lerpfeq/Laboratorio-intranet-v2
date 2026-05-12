@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import EtiquetaReagente from '@/components/EtiquetaReagente';
+import ReagenteLabelPreview from '@/components/ReagenteLabelPreview';
+import StorageLocationSelector from '@/components/StorageLocationSelector';
 
 interface Reagent {
   id: string;
@@ -131,52 +132,11 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
   const [reagentes, setReagentes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [filtros, setFiltros] = useState({ nome: '', marca: '' });
-  const [reemitindoId, setReemitindoId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchReagentes();
   }, []);
 
-  const downloadBase64 = (base64: string, fileName: string, mimeType: string) => {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: mimeType });
-    const blobUrl = URL.createObjectURL(blob);
-
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(blobUrl);
-  };
-
-  const reemitirEtiqueta = async (id: string, codigo: string) => {
-    try {
-      setReemitindoId(id);
-      const response = await fetch(`/api/reagentes/${id}/etiqueta`);
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        downloadBase64(data.etiquetaPdfBase64, data.etiquetaFileName, 'application/pdf');
-        alert(`Etiqueta ${codigo} reemitida com sucesso!`);
-      } else {
-        alert(`Erro ao gerar etiqueta: ${data.error || 'falha desconhecida'}`);
-      }
-    } catch (error) {
-      console.error('Erro ao reemitir etiqueta:', error);
-      alert('Erro ao reemitir etiqueta');
-    } finally {
-      setReemitindoId(null);
-    }
-  };
 
   const fetchReagentes = async (nome = '', marca = '') => {
     setLoading(true);
@@ -275,24 +235,46 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
                   </td>
                   <td><span className={`status-badge status-${r.status}`}>{r.status}</span></td>
                   <td>
-                    <button
-                      onClick={() => reemitirEtiqueta(r.id, ultimaEntrada?.codigoInterno || '')}
-                      disabled={userCategory === 'IC' || !ultimaEntrada?.codigoInterno || reemitindoId === r.id}
-                      className="button"
-                      style={{
-                        padding: '0.45rem 0.75rem',
-                        backgroundColor: userCategory === 'IC' ? '#d5d8dc' : '#e8f4fd',
-                        color: userCategory === 'IC' ? '#7f8c8d' : '#2471a3',
-                        border: '1px solid #aed6f1',
-                        borderRadius: '4px',
-                        cursor: userCategory === 'IC' ? 'not-allowed' : 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                      }}
-                      title={userCategory === 'IC' ? 'Perfil IC sem permissão para reemitir etiqueta' : 'Reemitir etiqueta PDF'}
-                    >
-                      {reemitindoId === r.id ? 'Gerando...' : '📄 Reemitir Etiqueta'}
-                    </button>
+                    {userCategory === 'IC' || !ultimaEntrada?.codigoInterno ? (
+                      <button
+                        disabled
+                        className="button"
+                        style={{
+                          padding: '0.45rem 0.75rem',
+                          backgroundColor: '#d5d8dc',
+                          color: '#7f8c8d',
+                          border: '1px solid #aed6f1',
+                          borderRadius: '4px',
+                          cursor: 'not-allowed',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                        }}
+                        title="Perfil IC sem permissão para reemitir etiqueta"
+                        type="button"
+                      >
+                        📄 Reemitir Etiqueta
+                      </button>
+                    ) : (
+                      <Link href={`/reagentes/reemitir/${r.id}`}>
+                        <button
+                          className="button"
+                          style={{
+                            padding: '0.45rem 0.75rem',
+                            backgroundColor: '#e8f4fd',
+                            color: '#2471a3',
+                            border: '1px solid #aed6f1',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}
+                          title="Abrir tela de reemissão"
+                          type="button"
+                        >
+                          📄 Reemitir Etiqueta
+                        </button>
+                      </Link>
+                    )}
                   </td>
                 </tr>
               );
@@ -307,7 +289,8 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
 function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [etiquetas, setEtiquetas] = useState<any[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [reagenteCadastrado, setReagenteCadastrado] = useState<{ id: string; codigo: string } | null>(null);
   const [formData, setFormData] = useState({
     nome: '',
     marca: '',
@@ -324,11 +307,28 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
     responsavel: '',
   });
 
+  const resetForm = () => {
+    setFormData({
+      nome: '',
+      marca: '',
+      volume: '',
+      localidade: '',
+      fornecedor: '',
+      notaFiscal: '',
+      quantidade: 1,
+      dataEntrada: new Date().toISOString().split('T')[0],
+      categoria: '',
+      concentracao: '',
+      dataValidade: '',
+      perigos: '',
+      responsavel: '',
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
-    setEtiquetas([]);
 
     try {
       const res = await fetch('/api/reagentes', {
@@ -338,27 +338,17 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
       });
 
       if (res.ok) {
-        const data = await res.json(); // always an array
-        setEtiquetas(data);
-        setMessage(`Reagent successfully added! ${data.length} label${data.length > 1 ? 's' : ''} generated.`);
-        setTimeout(() => {
-          setFormData({
-            nome: '',
-            marca: '',
-            volume: '',
-            localidade: '',
-            fornecedor: '',
-            notaFiscal: '',
-            quantidade: 1,
-            dataEntrada: new Date().toISOString().split('T')[0],
-            categoria: '',
-            concentracao: '',
-            dataValidade: '',
-            perigos: '',
-            responsavel: '',
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const primeiraEntrada = data[0];
+          setReagenteCadastrado({
+            id: primeiraEntrada.id,
+            codigo: primeiraEntrada.codigoInterno,
           });
-        }, 3000);
-        onSuccess();
+          setShowPreview(true);
+          setMessage(`Reagent successfully added! ${data.length} label${data.length > 1 ? 's' : ''} generated.`);
+          onSuccess();
+        }
       } else {
         setMessage('Error adding reagent.');
       }
@@ -369,40 +359,17 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
     }
   };
 
-  if (etiquetas.length > 0) {
+  if (showPreview && reagenteCadastrado) {
     return (
-      <div>
-        <h3 style={{ marginBottom: '0.5rem', color: '#27ae60' }}>✅ Generated Label{etiquetas.length > 1 ? 's' : ''}</h3>
-        <p style={{ marginBottom: '1.5rem', color: '#7f8c8d', fontSize: '14px' }}>
-          {etiquetas.length} label{etiquetas.length > 1 ? 's' : ''} generated — one per bottle.
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {etiquetas.map((entrada, idx) => (
-            <div key={entrada.id}>
-              {etiquetas.length > 1 && (
-                <p style={{ marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '13px', color: '#555' }}>
-                  Bottle {idx + 1} of {etiquetas.length} — <code>{entrada.codigoInterno}</code>
-                </p>
-              )}
-              <EtiquetaReagente entrada={entrada} logoUrl="/logo.png" />
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={() => setEtiquetas([])}
-          style={{
-            marginTop: '2rem',
-            padding: '0.75rem 1.5rem',
-            background: '#3498db',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          Register Another Reagent
-        </button>
-      </div>
+      <ReagenteLabelPreview
+        reagente={reagenteCadastrado}
+        onRegisterAnother={() => {
+          setShowPreview(false);
+          setReagenteCadastrado(null);
+          setMessage('');
+          resetForm();
+        }}
+      />
     );
   }
 
@@ -471,15 +438,12 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
 
+      <StorageLocationSelector
+        value={formData.localidade}
+        onChange={(location) => setFormData({ ...formData, localidade: location })}
+      />
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <div className="form-group">
-          <label>Location (e.g. CAB-03 | SHF-02)</label>
-          <input
-            type="text"
-            value={formData.localidade}
-            onChange={(e) => setFormData({ ...formData, localidade: e.target.value })}
-          />
-        </div>
         <div className="form-group">
           <label>Expiry Date</label>
           <input
@@ -488,9 +452,6 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
             onChange={(e) => setFormData({ ...formData, dataValidade: e.target.value })}
           />
         </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
           <label>Supplier *</label>
           <input
@@ -500,6 +461,9 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
             required
           />
         </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
           <label>Invoice Number</label>
           <input
@@ -508,12 +472,11 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
             onChange={(e) => setFormData({ ...formData, notaFiscal: e.target.value })}
           />
         </div>
-      </div>
-
-      <div className="form-group">
+        <div className="form-group">
+          <label>Hazard Class</label>
           <select
             value={formData.perigos}
-             onChange={(e) => setFormData({ ...formData, perigos: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, perigos: e.target.value })}
           >
             <option value="">Select a category</option>
             <option value="Flammable">Flammable</option>
@@ -523,7 +486,9 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
             <option value="Oxidizer">Oxidizer</option>
             <option value="Inert">Inert</option>
           </select>
+        </div>
       </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div className="form-group">
           <label>Quantity *</label>
