@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         fabricante: reagenteEntrada.marca || reagenteEntrada.reagente.marca || "-",
         localizacao: reagenteEntrada.localizacao || "-",
         volume: reagenteEntrada.volume,
+        dataEntrada: reagenteEntrada.dataEntrada,
         dataValidade: reagenteEntrada.dataValidade,
       },
     });

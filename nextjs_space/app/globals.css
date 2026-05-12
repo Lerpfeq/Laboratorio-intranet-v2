@@ -62,8 +62,25 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
 .button-primary { background: #3498db; color: white; }
 .button-primary:hover { background: #2980b9; }
 
-.button-danger { background: #e74c3c; color: white; }
-.button-danger:hover { background: #c0392b; }
+.button-danger {
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.button-danger:hover {
+  background-color: #b71c1c;
+}
+
+.button-danger:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
 
 .button-success { background: #27ae60; color: white; }
 .button-success:hover { background: #229954; }

@@ -112,7 +112,7 @@ export default function ReagentesPage() {
               onClick={() => setTab('saida')}
               style={{ padding: '0.75rem 1rem', background: tab === 'saida' ? '#3498db' : 'transparent', color: tab === 'saida' ? 'white' : '#333', border: 'none', cursor: 'pointer', borderRadius: '4px 4px 0 0' }}
             >
-              Reagent Output
+              🗑️ Descarte de Reagente
             </button>
           </div>
         )}
@@ -120,7 +120,7 @@ export default function ReagentesPage() {
         {tab === 'consulta' && <ConsultaReagentes userCategory={user?.category} />}
         {tab === 'entrada' && (isPosGraduando || isAdmin) && <EntradaForm onSuccess={fetchUserAndReagentes} />}
         {tab === 'saida' && (isPosGraduando || isAdmin) && (
-          <SaidaForm onSuccess={fetchUserAndReagentes} responsavelPadrao={session?.user?.name || user?.name || ''} />
+          <SaidaForm onSuccess={fetchUserAndReagentes} />
         )}
       </main>
     </div>
@@ -567,110 +567,96 @@ function EntradaForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function SaidaForm({ onSuccess, responsavelPadrao }: { onSuccess: () => void; responsavelPadrao: string }) {
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [codigoInterno, setCodigoInterno] = useState('');
-  const [volumeSaida, setVolumeSaida] = useState('');
-  const [motivo, setMotivo] = useState('');
+function SaidaForm({ onSuccess }: { onSuccess: () => void }) {
+  const { data: session } = useSession();
+  const [codigo, setCodigo] = useState('');
   const [reagente, setReagente] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   const buscarPorCodigo = async () => {
-    if (!codigoInterno.trim()) {
-      setMessage('Digite o código interno para buscar.');
+    if (!codigo.trim()) {
+      alert('Digite o código interno');
       return;
     }
 
-    setLoading(true);
-    setMessage('');
-
     try {
-      const response = await fetch(`/api/reagentes/buscar-codigo?codigo=${encodeURIComponent(codigoInterno)}`);
+      setLoading(true);
+      const response = await fetch(`/api/reagentes/buscar-codigo?codigo=${encodeURIComponent(codigo)}`);
       const data = await response.json();
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setReagente(data.reagente);
-        setMessage('Reagente encontrado. Preencha o volume de saída para registrar.');
       } else {
+        alert('Reagente não encontrado');
         setReagente(null);
-        setMessage(data.error || 'Reagente não encontrado.');
       }
     } catch (error) {
       console.error('Erro ao buscar reagente:', error);
-      setMessage('Erro ao buscar reagente.');
-      setReagente(null);
+      alert('Erro ao buscar reagente');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const registrarDescarte = async () => {
     if (!reagente) {
-      setMessage('Busque um reagente pelo código antes de registrar a saída.');
+      alert('Busque um reagente primeiro');
       return;
     }
 
-    const saidaNumero = Number.parseFloat(volumeSaida);
-    if (!Number.isFinite(saidaNumero) || saidaNumero <= 0) {
-      setMessage('Informe um volume de saída válido.');
-      return;
-    }
-
-    const confirmarSaida = window.confirm(
-      `Confirmar saída do frasco ${reagente.codigo} (${reagente.nome}) com volume ${saidaNumero}?`
+    const confirmar = window.confirm(
+      `Tem certeza que deseja registrar o descarte/fim do frasco ${reagente.codigo}?\n\nEsta ação é IRREVERSÍVEL e o registro será DELETADO permanentemente do banco de dados.`
     );
 
-    if (!confirmarSaida) {
+    if (!confirmar) {
       return;
     }
 
-    setLoading(true);
-    setMessage('');
-
     try {
-      const res = await fetch('/api/reagentes/saida', {
-        method: 'POST',
+      setLoading(true);
+
+      const response = await fetch('/api/reagentes/descarte', {
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reagenteId: reagente.id,
           codigo: reagente.codigo,
-          volumeSaida: saidaNumero,
-          motivo,
-          responsavel: responsavelPadrao,
+          responsavel: session?.user?.name,
         }),
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
-      if (res.ok && data.success) {
-        setMessage(data.removido ? 'Saída registrada e frasco removido do estoque.' : `Saída registrada. Novo volume: ${data.novoVolume}`);
-        setCodigoInterno('');
+      if (data.success) {
+        alert('Frasco descartado e removido do inventário com sucesso!');
+        setCodigo('');
         setReagente(null);
-        setVolumeSaida('');
-        setMotivo('');
         onSuccess();
       } else {
-        setMessage(data.error || 'Erro ao registrar saída.');
+        alert(`Erro: ${data.error || 'Erro ao registrar descarte'}`);
       }
     } catch (error) {
-      console.error('Erro ao registrar saída:', error);
-      setMessage('Erro ao registrar saída.');
+      console.error('Erro ao registrar descarte:', error);
+      alert('Erro ao registrar descarte');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ maxWidth: '700px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '700px', margin: '0 auto' }}>
+      <h3>Descarte de Reagente</h3>
+      <p style={{ marginBottom: '1rem' }}>
+        Registre quando um frasco acabou (será removido do inventário).
+      </p>
+
       <div className="form-group">
-        <label>Internal Code *</label>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <label>Internal Code:</label>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <input
             type="text"
-            value={codigoInterno}
-            onChange={(e) => setCodigoInterno(e.target.value.toUpperCase())}
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
             placeholder="Ex: LERP-U5833"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -679,54 +665,43 @@ function SaidaForm({ onSuccess, responsavelPadrao }: { onSuccess: () => void; re
               }
             }}
           />
-          <button type="button" className="button" disabled={loading} onClick={buscarPorCodigo}>
-            {loading ? 'Buscando...' : '🔍 Buscar'}
+          <button type="button" onClick={buscarPorCodigo} disabled={loading} className="button button-primary">
+            🔍 Buscar
           </button>
         </div>
       </div>
 
       {reagente && (
-        <div style={{ border: '1px solid #d9e2ec', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', background: '#fafcff' }}>
-          <h3 style={{ marginTop: 0 }}>Reagente Encontrado</h3>
+        <div
+          className="card"
+          style={{ backgroundColor: '#fff3cd', border: '2px solid #ffc107', padding: '1rem', borderRadius: '8px' }}
+        >
+          <h3>⚠️ Reagente Encontrado:</h3>
           <p><strong>Código:</strong> {reagente.codigo}</p>
           <p><strong>Nome:</strong> {reagente.nome}</p>
           <p><strong>Fabricante:</strong> {reagente.fabricante || '-'}</p>
           <p><strong>Localização:</strong> {reagente.localizacao || '-'}</p>
-          <p><strong>Volume disponível:</strong> {reagente.volume || '-'}</p>
+          <p>
+            <strong>Data de entrada:</strong>{' '}
+            {reagente.dataEntrada ? new Date(reagente.dataEntrada).toLocaleDateString('pt-BR') : '-'}
+          </p>
+
+          <hr />
+
+          <p style={{ color: '#d32f2f', fontWeight: 'bold' }}>
+            ⚠️ ATENÇÃO: Ao confirmar, este frasco será DELETADO PERMANENTEMENTE do banco de dados.
+          </p>
+
+          <button
+            type="button"
+            onClick={registrarDescarte}
+            disabled={loading}
+            className="button button-danger"
+          >
+            🗑️ Registrar Descarte (Deletar Frasco)
+          </button>
         </div>
       )}
-
-      <div className="form-group">
-        <label>Volume de saída</label>
-        <input
-          type="number"
-          min="0"
-          step="0.001"
-          value={volumeSaida}
-          onChange={(e) => setVolumeSaida(e.target.value)}
-          placeholder="Ex: 0.25"
-        />
-      </div>
-
-      <div className="form-group">
-        <label>Motivo / Uso</label>
-        <input
-          type="text"
-          value={motivo}
-          onChange={(e) => setMotivo(e.target.value)}
-          placeholder="Ex: Experimento X"
-        />
-      </div>
-
-      <button type="submit" disabled={loading} className="button button-primary">
-        {loading ? 'Registrando...' : '✅ Registrar Saída'}
-      </button>
-
-      {message && (
-        <div className={message.includes('registrada') || message.includes('Novo volume') ? 'success-message' : 'error-message'}>
-          {message}
-        </div>
-      )}
-    </form>
+    </div>
   );
 }
