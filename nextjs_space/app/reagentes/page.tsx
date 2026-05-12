@@ -129,6 +129,7 @@ function getStatus(dataValidade: string | null): 'Valid' | 'Expired' {
 }
 
 function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
+  const router = useRouter();
   const [reagentes, setReagentes] = useState<InventoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -252,46 +253,29 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
                     </span>
                   </td>
                   <td>
-                    {userCategory === 'IC' || !entrada?.id ? (
+                    <div style={{ display: 'flex', gap: '8px' }}>
                       <button
-                        disabled
-                        className="button"
-                        style={{
-                          padding: '0.45rem 0.75rem',
-                          backgroundColor: '#d5d8dc',
-                          color: '#7f8c8d',
-                          border: '1px solid #aed6f1',
-                          borderRadius: '4px',
-                          cursor: 'not-allowed',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                        }}
-                        title="IC profile does not have permission to reissue label"
+                        onClick={() => router.push(`/reagentes/edit/${entrada?.id}`)}
+                        className="button-secondary"
+                        style={{ fontSize: '14px', padding: '6px 12px' }}
+                        disabled={userCategory === 'IC' || !entrada?.id}
+                        title={userCategory === 'IC' ? 'IC profile does not have permission to edit reagent' : 'Open edit page'}
+                        type="button"
+                      >
+                        ✏️ Edit
+                      </button>
+
+                      <button
+                        onClick={() => router.push(`/reagentes/reemitir/${entrada?.id}`)}
+                        className="button-secondary"
+                        style={{ fontSize: '14px', padding: '6px 12px' }}
+                        disabled={userCategory === 'IC' || !entrada?.id}
+                        title={userCategory === 'IC' ? 'IC profile does not have permission to reissue label' : 'Open label reissue page'}
                         type="button"
                       >
                         📄 Reissue Label
                       </button>
-                    ) : (
-                      <Link href={`/reagentes/reemitir/${entrada.id}`}>
-                        <button
-                          className="button"
-                          style={{
-                            padding: '0.45rem 0.75rem',
-                            backgroundColor: '#e8f4fd',
-                            color: '#2471a3',
-                            border: '1px solid #aed6f1',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                          }}
-                          title="Open label reissue page"
-                          type="button"
-                        >
-                          📄 Reissue Label
-                        </button>
-                      </Link>
-                    )}
+                    </div>
                   </td>
                 </tr>
               );

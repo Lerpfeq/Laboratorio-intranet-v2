@@ -255,3 +255,44 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
   background-color: #f44336;
   color: white;
 }
+
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 30px;
+  justify-content: flex-start;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 0.95em;
+  margin-top: -10px;
+  margin-bottom: 20px;
+}
+
+.button-secondary {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.button-secondary:hover {
+  background-color: #5a6268;
+}
+
+.button-secondary:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
