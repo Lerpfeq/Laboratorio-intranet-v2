@@ -197,6 +197,19 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
     color: rgb(0, 0, 0),
   });
 
+  // Storage Location
+  if (payload.localizacao?.trim()) {
+    y -= 10;
+    page.drawText(sanitizeForPdf(`Location: ${payload.localizacao.trim()}`), {
+      x: 15,
+      y,
+      size: 7,
+      font,
+      color: rgb(0.25, 0.25, 0.25),
+      maxWidth: pageWidth - 30,
+    });
+  }
+
   // Rodapé
   const entrada = formatDate(payload.dataEntrada, "en-US");
   const marcaLabel = payload.marca?.trim() || payload.fornecedor?.trim() || payload.fabricante?.trim() || "";
