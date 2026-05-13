@@ -6,7 +6,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Ox
 
 code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace; }
 
-.header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 1.5rem 2rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); position: sticky; top: 0; z-index: 1000; }
+.header { background: linear-gradient(135deg, #0c2340 0%, #1b3a5c 100%); color: white; padding: 1.5rem 2rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); position: sticky; top: 0; z-index: 1000; }
 
 .header-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
 
