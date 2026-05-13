@@ -1,11 +1,11 @@
 generator client {
-    provider = "prisma-client-js"
-    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "rhel-openssl-3.0.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-    provider = "postgresql"
-    url = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum ClasseResiduo {
@@ -24,18 +24,18 @@ enum EstadoResiduo {
 }
 
 model Account {
-  id                 String    @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?   @db.Text
-  access_token       String?   @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?   @db.Text
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -62,14 +62,14 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  reagentes     ReagenteEntrada[]
-  saidas        ReagenteSaida[]
-  pedidos       Pedido[]
-  agendamentos  Agendamento[]
-  autorizacoes  AutorizacaoEquipamento[]
-  residuos      RegistroResiduo[]
+  accounts     Account[]
+  sessions     Session[]
+  reagentes    ReagenteEntrada[]
+  saidas       ReagenteSaida[]
+  pedidos      Pedido[]
+  agendamentos Agendamento[]
+  autorizacoes AutorizacaoEquipamento[]
+  residuos     RegistroResiduo[]
 
   @@index([status])
   @@index([category])
@@ -84,12 +84,12 @@ model VerificationToken {
 }
 
 model Equipamento {
-  id           String   @id @default(cuid())
-  nome         String
-  descricao    String?
-  status       String   @default("disponivel")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id        String   @id @default(cuid())
+  nome      String
+  descricao String?
+  status    String   @default("disponivel")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   autorizacoes AutorizacaoEquipamento[]
   agendamentos Agendamento[]
@@ -113,15 +113,15 @@ model AutorizacaoEquipamento {
 }
 
 model Reagente {
-  id           String   @id @default(cuid())
-  nome         String
-  marca        String?
-  volume       String?
-  localidade   String?
-  status       String   @default("ok")
+  id                String   @id @default(cuid())
+  nome              String
+  marca             String?
+  volume            String?
+  localidade        String?
+  status            String   @default("ok")
   ultimaAtualizacao DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   entradas ReagenteEntrada[]
   saidas   ReagenteSaida[]
@@ -133,31 +133,31 @@ model Reagente {
 }
 
 model ReagenteEntrada {
-  id              String   @id @default(cuid())
-  reagenteId      String
-  usuarioId       String
-  dataEntrada     DateTime
-  fornecedor      String
-  notaFiscal      String?
-  quantidade      Float
-  quantidadeAtual Float?
-  unidade         String   @default("L")
-  marca           String?
-  codigoInterno   String   @unique
-  codigoQR        String?  @db.Text
-  localizacao     String?
-  observacoes     String?  @db.Text
-  categoria       String?
-  concentracao    String?
-  dataValidade    DateTime?
+  id                    String    @id @default(cuid())
+  reagenteId            String
+  usuarioId             String?
+  dataEntrada           DateTime
+  fornecedor            String
+  notaFiscal            String?
+  quantidade            Float
+  quantidadeAtual       Float?
+  unidade               String    @default("L")
+  marca                 String?
+  codigoInterno         String    @unique
+  codigoQR              String?   @db.Text
+  localizacao           String?
+  observacoes           String?   @db.Text
+  categoria             String?
+  concentracao          String?
+  dataValidade          DateTime?
   validadeIndeterminada Boolean   @default(false)
-  perigos         String?  @db.Text
-  responsavel     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  perigos               String?   @db.Text
+  responsavel           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   reagente Reagente @relation(fields: [reagenteId], references: [id], onDelete: Cascade)
-  usuario  User     @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  usuario  User?    @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
   @@index([reagenteId])
   @@index([codigoInterno])
@@ -165,34 +165,34 @@ model ReagenteEntrada {
 }
 
 model ReagenteSaida {
-  id           String   @id @default(cuid())
-  reagenteId   String
-  usuarioId    String
-  dataSaida    DateTime
-  quantidade   Int
-  observacoes  String?  @db.Text
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  reagenteId  String
+  usuarioId   String?
+  dataSaida   DateTime
+  quantidade  Int
+  observacoes String?  @db.Text
+  createdAt   DateTime @default(now())
 
   reagente Reagente @relation(fields: [reagenteId], references: [id], onDelete: Cascade)
-  usuario  User     @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  usuario  User?    @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
   @@index([reagenteId])
   @@index([dataSaida])
 }
 
 model Pedido {
-  id           String   @id @default(cuid())
-  reagenteId   String
-  usuarioId    String
-  dataPedido   DateTime @default(now())
-  quantidade   Int
-  status       String   @default("pendente")
-  observacoes  String?  @db.Text
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  reagenteId  String
+  usuarioId   String?
+  dataPedido  DateTime @default(now())
+  quantidade  Int
+  status      String   @default("pendente")
+  observacoes String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   reagente Reagente @relation(fields: [reagenteId], references: [id], onDelete: Cascade)
-  usuario  User     @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  usuario  User?    @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
   @@index([reagenteId])
   @@index([status])
@@ -202,7 +202,7 @@ model Pedido {
 model Agendamento {
   id            String   @id @default(cuid())
   equipamentoId String
-  usuarioId     String
+  usuarioId     String?
   dataInicio    DateTime
   dataFim       DateTime
   observacoes   String?  @db.Text
@@ -210,7 +210,7 @@ model Agendamento {
   updatedAt     DateTime @updatedAt
 
   equipamento Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
-  usuario     User        @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  usuario     User?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
   @@index([equipamentoId])
   @@index([dataInicio])
@@ -218,30 +218,30 @@ model Agendamento {
 }
 
 model RegistroResiduo {
-  id                     String        @id @default(cuid())
-  usuarioId              String
-  numeroRecipiente       Int
-  composicao             String        @db.Text
-  classe                 ClasseResiduo
-  estado                 EstadoResiduo
-  tipoRecipiente         String
-  volumeRecipienteLitros Float
-  volumeAtualLitros      Float?
-  responsavel            String
-  departamento           String
-  data                   DateTime      @default(now())
-  ph                     Float?
-  observacoes            String?       @db.Text
-  halogenadosPercentual  Float?
-  acetonitrilaPercentual Float?
+  id                      String        @id @default(cuid())
+  usuarioId               String?
+  numeroRecipiente        Int
+  composicao              String        @db.Text
+  classe                  ClasseResiduo
+  estado                  EstadoResiduo
+  tipoRecipiente          String
+  volumeRecipienteLitros  Float
+  volumeAtualLitros       Float?
+  responsavel             String
+  departamento            String
+  data                    DateTime      @default(now())
+  ph                      Float?
+  observacoes             String?       @db.Text
+  halogenadosPercentual   Float?
+  acetonitrilaPercentual  Float?
   metaisPesadosPercentual Float?
-  presencaEnxofre        Boolean       @default(false)
-  geradorCianetos        Boolean       @default(false)
-  aminas                 Boolean       @default(false)
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
+  presencaEnxofre         Boolean       @default(false)
+  geradorCianetos         Boolean       @default(false)
+  aminas                  Boolean       @default(false)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 
-  usuario User @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  usuario User? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
   @@index([data])
   @@index([classe])
