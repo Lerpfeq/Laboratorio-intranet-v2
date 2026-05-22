@@ -1,13 +1,28 @@
 services:
   - type: web
     name: lerp-intranet
-    runtime: node
-    region: oregon
-    plan: free
-    branch: main
-    rootDir: nextjs_space
-    buildCommand: "yarn install --production=false && yarn prisma generate && yarn build"
-    startCommand: "yarn start"
+    env: node
+    buildCommand: |
+      echo "=== Installing system dependencies ==="
+      apt-get update -qq
+      apt-get install -y python3 python3-pip python3-dev
+
+      echo "=== Installing rembg (background removal) ==="
+      pip3 install --no-cache-dir rembg[cpu]==2.0.50 onnxruntime==1.16.0
+
+      echo "=== Verifying rembg installation ==="
+      python3 -c "import rembg; print('✅ rembg installed:', rembg.__version__)"
+
+      echo "=== Building Next.js app ==="
+      cd nextjs_space
+      npm install
+      npx prisma generate
+      npm run build
+
+      echo "=== Build complete! ==="
+    startCommand: cd nextjs_space && npm start
+    regions:
+      - sa-east-1
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -21,3 +36,11 @@ services:
         sync: false
       - key: NODE_ENV
         value: production
+
+  - type: pserv
+    name: lerp-database
+    plan: free
+    ipAllowList: []
+    postgreSQL:
+      name: lerp_intranet
+      user: postgreslerp
