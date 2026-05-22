@@ -11,13 +11,13 @@ import {
   Views,
 } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Calendar = RBCalendar as unknown as React.ComponentType<any>;
 
-const locales = { 'pt-BR': ptBR };
+const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
 
 interface UserInfo {
@@ -145,19 +145,19 @@ export default function AgendamentosPage() {
     return map;
   }, [equipamentos]);
 
-  // Convert agendamentos to calendar events
+  // Convert bookings to calendar events
   const events: AgendamentoEvent[] = useMemo(() => {
     return agendamentos.map((ag) => {
-      let paraQuem = ag.usuario?.name || 'Desconhecido';
+      let target = ag.usuario?.name || 'Unknown';
       if (ag.paraUsuarioInterno) {
-        paraQuem = ag.paraUsuarioInterno.name || ag.paraUsuarioInterno.email;
+        target = ag.paraUsuarioInterno.name || ag.paraUsuarioInterno.email;
       } else if (ag.paraUsuarioExterno) {
-        paraQuem = `${ag.paraUsuarioExterno} (Externo)`;
+        target = `${ag.paraUsuarioExterno} (External)`;
       }
 
       return {
         id: ag.id,
-        title: `${ag.equipamento?.nome || 'Equip.'} - ${paraQuem}`,
+        title: `${ag.equipamento?.nome || 'Equip.'} - ${target}`,
         start: new Date(ag.inicio),
         end: new Date(ag.fim),
         resource: ag,
@@ -182,7 +182,6 @@ export default function AgendamentosPage() {
   const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
     const start = slotInfo.start as Date;
     const end = slotInfo.end as Date;
-    // Format for datetime-local
     const pad = (n: number) => String(n).padStart(2, '0');
     const fmtDate = (d: Date) =>
       `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -206,21 +205,20 @@ export default function AgendamentosPage() {
   };
 
   const handleSubmit = async () => {
-    // Validations
-    if (!formData.equipamentoId) return showMsg('error', 'Selecione um equipamento');
-    if (!formData.inicio || !formData.fim) return showMsg('error', 'Datas são obrigatórias');
+    if (!formData.equipamentoId) return showMsg('error', 'Please select an equipment');
+    if (!formData.inicio || !formData.fim) return showMsg('error', 'Start and end times are required');
 
     const inicioDate = new Date(formData.inicio);
     const fimDate = new Date(formData.fim);
-    if (fimDate <= inicioDate) return showMsg('error', 'Fim deve ser posterior ao início');
+    if (fimDate <= inicioDate) return showMsg('error', 'End time must be after start time');
 
     if (formData.paraQuem === 'externo') {
-      if (!formData.paraUsuarioExterno.trim()) return showMsg('error', 'Nome do externo é obrigatório');
-      if (!formData.emailExterno.trim()) return showMsg('error', 'Email do externo é obrigatório');
-      if (!formData.emailOrientador.trim()) return showMsg('error', 'Email do orientador é obrigatório para externos');
+      if (!formData.paraUsuarioExterno.trim()) return showMsg('error', 'External user name is required');
+      if (!formData.emailExterno.trim()) return showMsg('error', 'External user email is required');
+      if (!formData.emailOrientador.trim()) return showMsg('error', 'Advisor email is required for external users');
     }
     if (formData.paraQuem === 'interno' && !formData.paraUsuarioInternoId) {
-      return showMsg('error', 'Selecione o usuário interno');
+      return showMsg('error', 'Please select an internal user');
     }
 
     setSaving(true);
@@ -232,54 +230,54 @@ export default function AgendamentosPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        showMsg('success', 'Agendamento criado com sucesso!');
+        showMsg('success', 'Booking created successfully!');
         setShowModal(false);
         fetchAgendamentos();
       } else {
-        showMsg('error', data.error || 'Erro ao criar agendamento');
+        showMsg('error', data.error || 'Error creating booking');
       }
-    } catch { showMsg('error', 'Erro de conexão'); }
+    } catch { showMsg('error', 'Connection error'); }
     setSaving(false);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Excluir este agendamento?')) return;
+    if (!confirm('Delete this booking?')) return;
     try {
       const res = await fetch(`/api/agendamentos/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        showMsg('success', 'Agendamento excluído!');
+        showMsg('success', 'Booking deleted!');
         setShowDetailModal(null);
         fetchAgendamentos();
       } else {
         const data = await res.json();
-        showMsg('error', data.error || 'Erro ao excluir');
+        showMsg('error', data.error || 'Error deleting booking');
       }
-    } catch { showMsg('error', 'Erro de conexão'); }
+    } catch { showMsg('error', 'Connection error'); }
   };
 
   if (status === 'loading' || loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Carregando...</div>;
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
   const isAdmin = user?.category === 'Admin';
   const formatDateTime = (d: string) => {
     const date = new Date(d);
-    return date.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    return date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
   };
 
-  const messages = {
-    today: 'Hoje',
+  const calendarMessages = {
+    today: 'Today',
     previous: '←',
     next: '→',
-    month: 'Mês',
-    week: 'Semana',
-    day: 'Dia',
+    month: 'Month',
+    week: 'Week',
+    day: 'Day',
     agenda: 'Agenda',
-    date: 'Data',
-    time: 'Hora',
-    event: 'Evento',
-    noEventsInRange: 'Sem agendamentos neste período.',
-    showMore: (total: number) => `+${total} mais`,
+    date: 'Date',
+    time: 'Time',
+    event: 'Event',
+    noEventsInRange: 'No bookings in this period.',
+    showMore: (total: number) => `+${total} more`,
   };
 
   return (
@@ -294,22 +292,22 @@ export default function AgendamentosPage() {
           </div>
           <nav className="nav-tabs">
             <Link href="/dashboard">Dashboard</Link>
-            <Link href="/reagentes">Reagentes</Link>
-            <Link href="/agendamentos" style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '4px' }}>Calendário</Link>
-            <Link href="/residuos">Resíduos</Link>
+            <Link href="/reagentes">Reagent</Link>
+            <Link href="/agendamentos" style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '4px' }}>Calendar</Link>
+            <Link href="/residuos">Waste</Link>
             {isAdmin && <Link href="/agendamentos/settings">Settings</Link>}
             {isAdmin && <Link href="/admin">Admin</Link>}
           </nav>
           <div className="user-menu">
             <span>{user?.name || user?.email}</span>
-            <button onClick={() => router.push('/api/auth/signout')}>Sair</button>
+            <button onClick={() => router.push('/api/auth/signout')}>Sign Out</button>
           </div>
         </div>
       </header>
 
       <main className="container" style={{ maxWidth: '1400px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <h2 className="page-title" style={{ marginBottom: 0 }}>📅 Agendamento de Equipamentos</h2>
+          <h2 className="page-title" style={{ marginBottom: 0 }}>📅 Equipment Scheduling</h2>
           <button className="button button-primary" onClick={() => {
             const now = new Date();
             const pad = (n: number) => String(n).padStart(2, '0');
@@ -329,7 +327,7 @@ export default function AgendamentosPage() {
             });
             setShowModal(true);
           }}>
-            + Novo Agendamento
+            + New Booking
           </button>
         </div>
 
@@ -344,18 +342,18 @@ export default function AgendamentosPage() {
           background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '6px',
           padding: '10px 16px', marginBottom: '1rem', fontSize: '0.85rem', color: '#856404',
         }}>
-          ⚠️ Agendamentos passados são removidos automaticamente todos os dias à 00:05.
+          ⚠️ Past bookings are automatically deleted daily at 00:05. No history is kept.
         </div>
 
         {/* Filter by equipment */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ fontWeight: 500 }}>Filtrar equipamento:</label>
+          <label style={{ fontWeight: 500 }}>Filter equipment:</label>
           <select
             value={selectedEquipamento}
             onChange={(e) => setSelectedEquipamento(e.target.value)}
             style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '200px' }}
           >
-            <option value="all">Todos os equipamentos</option>
+            <option value="all">All equipment</option>
             {equipamentos.map((eq) => (
               <option key={eq.id} value={eq.id}>{eq.nome}</option>
             ))}
@@ -388,8 +386,8 @@ export default function AgendamentosPage() {
             onSelectSlot={handleSelectSlot}
             onSelectEvent={handleSelectEvent}
             eventPropGetter={eventStyleGetter}
-            messages={messages}
-            culture="pt-BR"
+            messages={calendarMessages}
+            culture="en-US"
             step={30}
             timeslots={2}
             min={new Date(2020, 0, 1, 7, 0)}
@@ -403,12 +401,12 @@ export default function AgendamentosPage() {
         {showModal && (
           <div className="modal" onClick={() => setShowModal(false)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>📅 Novo Agendamento</h3>
+              <h3 style={{ marginBottom: '1.5rem' }}>📅 New Booking</h3>
 
               <div className="form-group">
-                <label>Equipamento *</label>
+                <label>Equipment *</label>
                 <select value={formData.equipamentoId} onChange={(e) => setFormData({ ...formData, equipamentoId: e.target.value })}>
-                  <option value="">Selecione...</option>
+                  <option value="">Select...</option>
                   {equipamentos.map((eq) => (
                     <option key={eq.id} value={eq.id}>{eq.nome}</option>
                   ))}
@@ -416,19 +414,19 @@ export default function AgendamentosPage() {
               </div>
 
               <div className="form-group">
-                <label>Para quem? *</label>
+                <label>Book for *</label>
                 <select value={formData.paraQuem} onChange={(e) => setFormData({ ...formData, paraQuem: e.target.value as any })}>
-                  <option value="eu">Eu mesmo</option>
-                  <option value="interno">Usuário interno</option>
-                  <option value="externo">Usuário externo</option>
+                  <option value="eu">Myself</option>
+                  <option value="interno">Internal user</option>
+                  <option value="externo">External user</option>
                 </select>
               </div>
 
               {formData.paraQuem === 'interno' && (
                 <div className="form-group">
-                  <label>Selecionar usuário *</label>
+                  <label>Select user *</label>
                   <select value={formData.paraUsuarioInternoId} onChange={(e) => setFormData({ ...formData, paraUsuarioInternoId: e.target.value })}>
-                    <option value="">Selecione...</option>
+                    <option value="">Select...</option>
                     {allUsers.map((u) => (
                       <option key={u.id} value={u.id}>{u.name || u.email}</option>
                     ))}
@@ -439,40 +437,40 @@ export default function AgendamentosPage() {
               {formData.paraQuem === 'externo' && (
                 <>
                   <div className="form-group">
-                    <label>Nome do usuário externo *</label>
-                    <input value={formData.paraUsuarioExterno} onChange={(e) => setFormData({ ...formData, paraUsuarioExterno: e.target.value })} placeholder="Nome completo" />
+                    <label>External user name *</label>
+                    <input value={formData.paraUsuarioExterno} onChange={(e) => setFormData({ ...formData, paraUsuarioExterno: e.target.value })} placeholder="Full name" />
                   </div>
                   <div className="form-group">
-                    <label>Email do externo *</label>
-                    <input type="email" value={formData.emailExterno} onChange={(e) => setFormData({ ...formData, emailExterno: e.target.value })} placeholder="email@exemplo.com" />
+                    <label>External user email *</label>
+                    <input type="email" value={formData.emailExterno} onChange={(e) => setFormData({ ...formData, emailExterno: e.target.value })} placeholder="email@example.com" />
                   </div>
                   <div className="form-group">
-                    <label>Email do orientador * <span style={{ color: '#e74c3c', fontSize: '0.8rem' }}>(obrigatório para externos)</span></label>
-                    <input type="email" value={formData.emailOrientador} onChange={(e) => setFormData({ ...formData, emailOrientador: e.target.value })} placeholder="orientador@exemplo.com" />
+                    <label>Advisor email * <span style={{ color: '#e74c3c', fontSize: '0.8rem' }}>(required for external users)</span></label>
+                    <input type="email" value={formData.emailOrientador} onChange={(e) => setFormData({ ...formData, emailOrientador: e.target.value })} placeholder="advisor@example.com" />
                   </div>
                 </>
               )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
-                  <label>Início *</label>
+                  <label>Start *</label>
                   <input type="datetime-local" value={formData.inicio} onChange={(e) => setFormData({ ...formData, inicio: e.target.value })} />
                 </div>
                 <div className="form-group">
-                  <label>Fim *</label>
+                  <label>End *</label>
                   <input type="datetime-local" value={formData.fim} onChange={(e) => setFormData({ ...formData, fim: e.target.value })} />
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Observações</label>
-                <textarea value={formData.observacoes} onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })} rows={3} placeholder="Informações adicionais..." />
+                <label>Notes</label>
+                <textarea value={formData.observacoes} onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })} rows={3} placeholder="Additional information..." />
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button className="button button-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
+                <button className="button button-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                 <button className="button button-primary" onClick={handleSubmit} disabled={saving}>
-                  {saving ? 'Salvando...' : 'Agendar'}
+                  {saving ? 'Saving...' : 'Book'}
                 </button>
               </div>
             </div>
@@ -483,12 +481,12 @@ export default function AgendamentosPage() {
         {showDetailModal && (
           <div className="modal" onClick={() => setShowDetailModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '550px' }}>
-              <h3 style={{ marginBottom: '1rem' }}>📋 Detalhes do Agendamento</h3>
+              <h3 style={{ marginBottom: '1rem' }}>📋 Booking Details</h3>
 
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                   <tr style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px', fontWeight: 600, color: '#555', width: '40%' }}>Equipamento</td>
+                    <td style={{ padding: '10px', fontWeight: 600, color: '#555', width: '40%' }}>Equipment</td>
                     <td style={{ padding: '10px' }}>
                       {showDetailModal.equipamento?.nome}
                       {showDetailModal.equipamento?.sopLink && (
@@ -500,36 +498,36 @@ export default function AgendamentosPage() {
                     </td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Agendado por</td>
+                    <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Booked by</td>
                     <td style={{ padding: '10px' }}>{showDetailModal.usuario?.name || showDetailModal.usuario?.email || '—'}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Para</td>
+                    <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>For</td>
                     <td style={{ padding: '10px' }}>
                       {showDetailModal.paraUsuarioInterno
-                        ? `${showDetailModal.paraUsuarioInterno.name || showDetailModal.paraUsuarioInterno.email} (Interno)`
+                        ? `${showDetailModal.paraUsuarioInterno.name || showDetailModal.paraUsuarioInterno.email} (Internal)`
                         : showDetailModal.paraUsuarioExterno
-                        ? `${showDetailModal.paraUsuarioExterno} (Externo - ${showDetailModal.emailExterno})`
-                        : `${showDetailModal.usuario?.name || '—'} (Próprio)`}
+                        ? `${showDetailModal.paraUsuarioExterno} (External - ${showDetailModal.emailExterno})`
+                        : `${showDetailModal.usuario?.name || '—'} (Self)`}
                     </td>
                   </tr>
                   {showDetailModal.emailOrientador && (
                     <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Orientador</td>
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Advisor</td>
                       <td style={{ padding: '10px' }}>{showDetailModal.emailOrientador}</td>
                     </tr>
                   )}
                   <tr style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Início</td>
+                    <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Start</td>
                     <td style={{ padding: '10px' }}>{formatDateTime(showDetailModal.inicio)}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Fim</td>
+                    <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>End</td>
                     <td style={{ padding: '10px' }}>{formatDateTime(showDetailModal.fim)}</td>
                   </tr>
                   {showDetailModal.observacoes && (
                     <tr style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Observações</td>
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#555' }}>Notes</td>
                       <td style={{ padding: '10px' }}>{showDetailModal.observacoes}</td>
                     </tr>
                   )}
@@ -539,10 +537,10 @@ export default function AgendamentosPage() {
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
                 {(isAdmin || showDetailModal.userId === user?.id) && (
                   <button className="button button-danger" style={{ padding: '8px 16px' }} onClick={() => handleDelete(showDetailModal.id)}>
-                    🗑️ Excluir
+                    🗑️ Delete
                   </button>
                 )}
-                <button className="button button-secondary" onClick={() => setShowDetailModal(null)}>Fechar</button>
+                <button className="button button-secondary" onClick={() => setShowDetailModal(null)}>Close</button>
               </div>
             </div>
           </div>

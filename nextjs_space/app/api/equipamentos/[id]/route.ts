@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// GET - Buscar equipamento por ID
+// GET - Buscar equipment por ID
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -13,11 +13,11 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    const equipamento = await prisma.equipamento.findUnique({
+    const equipment = await prisma.equipamento.findUnique({
       where: { id },
       include: {
         autorizacoes: {
@@ -28,17 +28,17 @@ export async function GET(
       },
     });
 
-    if (!equipamento) {
-      return NextResponse.json({ error: 'Equipamento não encontrado' }, { status: 404 });
+    if (!equipment) {
+      return NextResponse.json({ error: 'Equipment not found' }, { status: 404 });
     }
 
-    return NextResponse.json(equipamento);
+    return NextResponse.json(equipment);
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
-// PUT - Atualizar equipamento
+// PUT - Update equipment
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -46,7 +46,7 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
@@ -58,13 +58,13 @@ export async function PUT(
         where: { equipamentoId: id, userId: session.user.id, tipo: 'RESPONSAVEL' },
       });
       if (!autorizacao) {
-        return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
+        return NextResponse.json({ error: 'No permission' }, { status: 403 });
       }
     }
 
     const { nome, descricao, sopLink } = await request.json();
 
-    const equipamento = await prisma.equipamento.update({
+    const equipment = await prisma.equipamento.update({
       where: { id },
       data: {
         nome: nome?.trim(),
@@ -73,13 +73,13 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(equipamento);
+    return NextResponse.json(equipment);
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
-// DELETE - Excluir equipamento (Admin only)
+// DELETE - Delete equipment (Admin only)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -87,12 +87,12 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (user?.category !== 'Admin') {
-      return NextResponse.json({ error: 'Apenas administradores' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin only' }, { status: 403 });
     }
 
     const { id } = await params;
@@ -100,6 +100,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

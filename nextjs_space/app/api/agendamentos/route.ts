@@ -6,12 +6,12 @@ import { sendAgendamentoEmails } from '@/lib/email/agendamento-email';
 
 export const dynamic = 'force-dynamic';
 
-// GET - Listar agendamentos (com filtros)
+// GET - List bookings (com filtros)
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       if (endDate) where.fim = { lte: new Date(endDate) };
     }
 
-    const agendamentos = await prisma.agendamento.findMany({
+    const bookings = await prisma.agendamento.findMany({
       where,
       include: {
         equipamento: true,
@@ -37,24 +37,24 @@ export async function GET(request: NextRequest) {
       orderBy: { inicio: 'asc' },
     });
 
-    return NextResponse.json(agendamentos);
+    return NextResponse.json(bookings);
   } catch (error: any) {
     console.error('Agendamentos GET error:', error);
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
-// POST - Criar agendamento
+// POST - Create booking
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (!user) {
-      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const body = await request.json();
@@ -70,22 +70,22 @@ export async function POST(request: NextRequest) {
       observacoes,
     } = body;
 
-    // Validações básicas
+    // Basic validations
     if (!equipamentoId) {
-      return NextResponse.json({ error: 'Equipamento é obrigatório' }, { status: 400 });
+      return NextResponse.json({ error: 'Equipment is required' }, { status: 400 });
     }
     if (!inicio || !fim) {
-      return NextResponse.json({ error: 'Início e fim são obrigatórios' }, { status: 400 });
+      return NextResponse.json({ error: 'Start and end times are required' }, { status: 400 });
     }
 
     const inicioDate = new Date(inicio);
     const fimDate = new Date(fim);
 
     if (fimDate <= inicioDate) {
-      return NextResponse.json({ error: 'Fim deve ser posterior ao início' }, { status: 400 });
+      return NextResponse.json({ error: 'End time must be after start time' }, { status: 400 });
     }
 
-    // Verificar se equipamento existe
+    // Check if equipment existe
     const equipamento = await prisma.equipamento.findUnique({
       where: { id: equipamentoId },
       include: {
@@ -97,40 +97,40 @@ export async function POST(request: NextRequest) {
     });
 
     if (!equipamento) {
-      return NextResponse.json({ error: 'Equipamento não encontrado' }, { status: 404 });
+      return NextResponse.json({ error: 'Equipment not found' }, { status: 404 });
     }
 
-    // Verificar autorização (Admin pode sempre, outros precisam autorização)
+    // Verificar authorization (Admin pode sempre, outros precisam authorization)
     if (user.category !== 'Admin') {
       const autorizacao = await prisma.autorizacaoEquipamento.findFirst({
         where: { equipamentoId, userId: session.user.id },
       });
       if (!autorizacao) {
         return NextResponse.json(
-          { error: 'Você não está autorizado a agendar este equipamento' },
+          { error: 'You are not authorized to book this equipment' },
           { status: 403 }
         );
       }
     }
 
-    // Validação externo
+    // External user validation
     if (paraQuem === 'externo') {
       if (!paraUsuarioExterno?.trim()) {
-        return NextResponse.json({ error: 'Nome do usuário externo é obrigatório' }, { status: 400 });
+        return NextResponse.json({ error: 'External user name is required' }, { status: 400 });
       }
       if (!emailExterno?.trim()) {
-        return NextResponse.json({ error: 'Email do usuário externo é obrigatório' }, { status: 400 });
+        return NextResponse.json({ error: 'External user email is required' }, { status: 400 });
       }
       if (!emailOrientador?.trim()) {
-        return NextResponse.json({ error: 'Email do orientador é obrigatório para externos' }, { status: 400 });
+        return NextResponse.json({ error: 'Advisor email is required for external users' }, { status: 400 });
       }
     }
 
     if (paraQuem === 'interno' && !paraUsuarioInternoId) {
-      return NextResponse.json({ error: 'Selecione o usuário interno' }, { status: 400 });
+      return NextResponse.json({ error: 'Please select an internal user' }, { status: 400 });
     }
 
-    // Verificar sobreposição de horário
+    // Check time overlap
     const overlap = await prisma.agendamento.findFirst({
       where: {
         equipamentoId,
@@ -142,13 +142,13 @@ export async function POST(request: NextRequest) {
 
     if (overlap) {
       return NextResponse.json(
-        { error: 'Já existe um agendamento neste horário para este equipamento' },
+        { error: 'This time slot is already booked for this equipment' },
         { status: 409 }
       );
     }
 
-    // Criar agendamento
-    const agendamento = await prisma.agendamento.create({
+    // Criar booking
+    const booking = await prisma.agendamento.create({
       data: {
         equipamentoId,
         userId: session.user.id,
@@ -167,20 +167,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Determinar "para quem"
+    // Determine target user
     let paraQuemNome = user.name || user.email || 'Desconhecido';
     let paraQuemEmail = user.email || '';
     const isExterno = paraQuem === 'externo';
 
-    if (paraQuem === 'interno' && agendamento.paraUsuarioInterno) {
-      paraQuemNome = agendamento.paraUsuarioInterno.name || agendamento.paraUsuarioInterno.email || 'Interno';
-      paraQuemEmail = agendamento.paraUsuarioInterno.email || '';
+    if (paraQuem === 'interno' && booking.paraUsuarioInterno) {
+      paraQuemNome = booking.paraUsuarioInterno.name || booking.paraUsuarioInterno.email || 'Interno';
+      paraQuemEmail = booking.paraUsuarioInterno.email || '';
     } else if (isExterno) {
       paraQuemNome = paraUsuarioExterno || 'Externo';
       paraQuemEmail = emailExterno || '';
     }
 
-    // Enviar emails (assíncrono - não bloqueia)
+    // Send emails (async - non-blocking)
     const responsavelEmails = equipamento.autorizacoes
       .map((a) => a.user.email)
       .filter(Boolean) as string[];
@@ -205,9 +205,9 @@ export async function POST(request: NextRequest) {
       isExterno
     );
 
-    return NextResponse.json(agendamento, { status: 201 });
+    return NextResponse.json(booking, { status: 201 });
   } catch (error: any) {
     console.error('Agendamentos POST error:', error);
-    return NextResponse.json({ error: error.message || 'Erro interno' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 });
   }
 }

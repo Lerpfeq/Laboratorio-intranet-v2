@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// GET - Listar autorizações de um equipamento
+// GET - List authorizations for an equipment
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -13,7 +13,7 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
@@ -27,11 +27,11 @@ export async function GET(
 
     return NextResponse.json(autorizacoes);
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
-// POST - Adicionar autorização
+// POST - Add authorization
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,7 +39,7 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
@@ -51,24 +51,24 @@ export async function POST(
         where: { equipamentoId: id, userId: session.user.id, tipo: 'RESPONSAVEL' },
       });
       if (!isResponsavel) {
-        return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
+        return NextResponse.json({ error: 'No permission' }, { status: 403 });
       }
     }
 
     const { userId, tipo } = await request.json();
 
     if (!userId || !tipo) {
-      return NextResponse.json({ error: 'userId e tipo são obrigatórios' }, { status: 400 });
+      return NextResponse.json({ error: 'userId and tipo are required' }, { status: 400 });
     }
 
     if (!['RESPONSAVEL', 'TREINADO'].includes(tipo)) {
       return NextResponse.json({ error: 'Tipo deve ser RESPONSAVEL ou TREINADO' }, { status: 400 });
     }
 
-    // Verificar se user existe
+    // Check if user existe
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) {
-      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const autorizacao = await prisma.autorizacaoEquipamento.upsert({
@@ -85,11 +85,11 @@ export async function POST(
     return NextResponse.json(autorizacao, { status: 201 });
   } catch (error: any) {
     console.error('Error creating autorizacao:', error);
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
-// DELETE - Remover autorização
+// DELETE - Remove authorization
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -97,7 +97,7 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
@@ -109,7 +109,7 @@ export async function DELETE(
         where: { equipamentoId: id, userId: session.user.id, tipo: 'RESPONSAVEL' },
       });
       if (!isResponsavel) {
-        return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
+        return NextResponse.json({ error: 'No permission' }, { status: 403 });
       }
     }
 
@@ -117,7 +117,7 @@ export async function DELETE(
     const autorizacaoId = searchParams.get('autorizacaoId');
 
     if (!autorizacaoId) {
-      return NextResponse.json({ error: 'autorizacaoId é obrigatório' }, { status: 400 });
+      return NextResponse.json({ error: 'autorizacaoId is required' }, { status: 400 });
     }
 
     await prisma.autorizacaoEquipamento.delete({
@@ -126,6 +126,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

@@ -5,12 +5,12 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// GET - Listar equipamentos (filtrado por permissão)
+// GET - List equipments (filtrado por permissão)
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = session.user.id;
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const isAdmin = user?.category === 'Admin';
 
     if (isAdmin) {
-      const equipamentos = await prisma.equipamento.findMany({
+      const equipments = await prisma.equipamento.findMany({
         include: {
           autorizacoes: {
             include: {
@@ -29,10 +29,10 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { nome: 'asc' },
       });
-      return NextResponse.json(equipamentos);
+      return NextResponse.json(equipments);
     } else {
-      // Usuário comum vê apenas onde tem autorização
-      const equipamentos = await prisma.equipamento.findMany({
+      // Regular user - only sees authorized equipment
+      const equipments = await prisma.equipamento.findMany({
         where: {
           autorizacoes: { some: { userId } },
         },
@@ -45,40 +45,40 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { nome: 'asc' },
       });
-      return NextResponse.json(equipamentos);
+      return NextResponse.json(equipments);
     }
   } catch (error: any) {
-    console.error('Error fetching equipamentos:', error);
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    console.error('Error fetching equipments:', error);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
-// POST - Criar equipamento (Admin only)
+// POST - Create equipment (Admin only)
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (user?.category !== 'Admin') {
-      return NextResponse.json({ error: 'Apenas administradores' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin only' }, { status: 403 });
     }
 
     const { nome, descricao, sopLink } = await request.json();
 
     if (!nome?.trim()) {
-      return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 });
+      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    const equipamento = await prisma.equipamento.create({
+    const equipment = await prisma.equipamento.create({
       data: { nome: nome.trim(), descricao: descricao?.trim() || null, sopLink: sopLink?.trim() || null },
     });
 
-    return NextResponse.json(equipamento, { status: 201 });
+    return NextResponse.json(equipment, { status: 201 });
   } catch (error: any) {
-    console.error('Error creating equipamento:', error);
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    console.error('Error creating equipment:', error);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

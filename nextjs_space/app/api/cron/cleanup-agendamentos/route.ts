@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// Cron Job - Executar diariamente às 00:05
-// Deleta agendamentos que já passaram
-// Pode ser chamado via cron externo (ex: cron-job.org) ou Render Cron
+// Cron Job - Run daily at 00:05
+// Deleta bookings que já passaram
+// Can be called via external cron (e.g. cron-job.org) or Render Cron
 export async function GET(request: NextRequest) {
   try {
     // Verificar token de segurança (para chamadas externas)
@@ -14,19 +14,19 @@ export async function GET(request: NextRequest) {
     const cronSecret = process.env.CRON_SECRET || 'lerp-cron-2026';
 
     if (token !== cronSecret) {
-      return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const now = new Date();
 
-    // Deletar agendamentos onde o fim já passou
+    // Deletar bookings onde o fim já passou
     const result = await prisma.agendamento.deleteMany({
       where: {
         fim: { lt: now },
       },
     });
 
-    console.log(`[Cron] Deleted ${result.count} past agendamentos at ${now.toISOString()}`);
+    console.log(`[Cron] Deleted ${result.count} past bookings at ${now.toISOString()}`);
 
     return NextResponse.json({
       success: true,
@@ -35,6 +35,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Cron] Cleanup error:', error);
-    return NextResponse.json({ error: 'Erro na limpeza' }, { status: 500 });
+    return NextResponse.json({ error: 'Cleanup error' }, { status: 500 });
   }
 }

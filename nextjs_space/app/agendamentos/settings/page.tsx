@@ -98,7 +98,7 @@ export default function SettingsPage() {
   };
 
   const handleCreateEquipamento = async () => {
-    if (!formData.nome.trim()) return showMsg('error', 'Nome é obrigatório');
+    if (!formData.nome.trim()) return showMsg('error', 'Name is required');
     setSaving(true);
     try {
       const res = await fetch('/api/equipamentos', {
@@ -107,15 +107,15 @@ export default function SettingsPage() {
         body: JSON.stringify(formData),
       });
       if (res.ok) {
-        showMsg('success', 'Equipamento criado!');
+        showMsg('success', 'Equipment created!');
         setShowCreateModal(false);
         setFormData({ nome: '', descricao: '', sopLink: '' });
         fetchEquipamentos();
       } else {
         const data = await res.json();
-        showMsg('error', data.error || 'Erro ao criar');
+        showMsg('error', data.error || 'Error creating equipment');
       }
-    } catch { showMsg('error', 'Erro de conexão'); }
+    } catch { showMsg('error', 'Connection error'); }
     setSaving(false);
   };
 
@@ -129,32 +129,32 @@ export default function SettingsPage() {
         body: JSON.stringify(formData),
       });
       if (res.ok) {
-        showMsg('success', 'Equipamento atualizado!');
+        showMsg('success', 'Equipment updated!');
         setShowEditModal(null);
         fetchEquipamentos();
       } else {
         const data = await res.json();
-        showMsg('error', data.error || 'Erro ao atualizar');
+        showMsg('error', data.error || 'Error updating equipment');
       }
-    } catch { showMsg('error', 'Erro de conexão'); }
+    } catch { showMsg('error', 'Connection error'); }
     setSaving(false);
   };
 
   const handleDeleteEquipamento = async (id: string, nome: string) => {
-    if (!confirm(`Excluir equipamento "${nome}"? Todos os agendamentos serão removidos.`)) return;
+    if (!confirm(`Delete equipment "${nome}"? All related bookings will be removed.`)) return;
     try {
       const res = await fetch(`/api/equipamentos/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        showMsg('success', 'Equipamento excluído!');
+        showMsg('success', 'Equipment deleted!');
         fetchEquipamentos();
       } else {
-        showMsg('error', 'Erro ao excluir');
+        showMsg('error', 'Error deleting equipment');
       }
-    } catch { showMsg('error', 'Erro de conexão'); }
+    } catch { showMsg('error', 'Connection error'); }
   };
 
   const handleAddAuth = async () => {
-    if (!showAuthModal || !authForm.userId) return showMsg('error', 'Selecione um usuário');
+    if (!showAuthModal || !authForm.userId) return showMsg('error', 'Please select a user');
     setSaving(true);
     try {
       const res = await fetch(`/api/equipamentos/${showAuthModal.id}/autorizacoes`, {
@@ -163,17 +163,16 @@ export default function SettingsPage() {
         body: JSON.stringify(authForm),
       });
       if (res.ok) {
-        showMsg('success', 'Autorização adicionada!');
+        showMsg('success', 'Authorization added!');
         setAuthForm({ userId: '', tipo: 'TREINADO' });
         fetchEquipamentos();
-        // Refresh auth modal data
         const updatedRes = await fetch(`/api/equipamentos/${showAuthModal.id}`);
         if (updatedRes.ok) setShowAuthModal(await updatedRes.json());
       } else {
         const data = await res.json();
-        showMsg('error', data.error || 'Erro ao adicionar');
+        showMsg('error', data.error || 'Error adding authorization');
       }
-    } catch { showMsg('error', 'Erro de conexão'); }
+    } catch { showMsg('error', 'Connection error'); }
     setSaving(false);
   };
 
@@ -185,16 +184,16 @@ export default function SettingsPage() {
         { method: 'DELETE' }
       );
       if (res.ok) {
-        showMsg('success', 'Autorização removida!');
+        showMsg('success', 'Authorization removed!');
         fetchEquipamentos();
         const updatedRes = await fetch(`/api/equipamentos/${showAuthModal.id}`);
         if (updatedRes.ok) setShowAuthModal(await updatedRes.json());
       }
-    } catch { showMsg('error', 'Erro de conexão'); }
+    } catch { showMsg('error', 'Connection error'); }
   };
 
   if (status === 'loading' || loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Carregando...</div>;
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
   if (!user || user.category !== 'Admin') return null;
@@ -213,19 +212,19 @@ export default function SettingsPage() {
           </div>
           <nav className="nav-tabs">
             <Link href="/dashboard">Dashboard</Link>
-            <Link href="/agendamentos">Calendário</Link>
+            <Link href="/agendamentos">Calendar</Link>
             <Link href="/agendamentos/settings" style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '4px' }}>Settings</Link>
             {user.category === 'Admin' && <Link href="/admin">Admin</Link>}
           </nav>
           <div className="user-menu">
             <span>{user.name || user.email}</span>
-            <button onClick={() => router.push('/api/auth/signout')}>Sair</button>
+            <button onClick={() => router.push('/api/auth/signout')}>Sign Out</button>
           </div>
         </div>
       </header>
 
       <main className="container">
-        <h2 className="page-title">⚙️ Settings - Equipamentos</h2>
+        <h2 className="page-title">⚙️ Settings - Equipment</h2>
 
         {message && (
           <div className={`alert alert-${message.type}`} style={{ marginBottom: '1rem' }}>
@@ -235,7 +234,7 @@ export default function SettingsPage() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <p style={{ color: '#666' }}>
-            Gerencie equipamentos e autorizações de uso.
+            Manage equipment and user authorizations.
           </p>
           <button
             className="button button-primary"
@@ -244,7 +243,7 @@ export default function SettingsPage() {
               setShowCreateModal(true);
             }}
           >
-            + Novo Equipamento
+            + New Equipment
           </button>
         </div>
 
@@ -253,19 +252,19 @@ export default function SettingsPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Nome</th>
-                <th>Descrição</th>
+                <th>Name</th>
+                <th>Description</th>
                 <th>SOP</th>
-                <th>Responsáveis</th>
-                <th>Treinados</th>
-                <th>Ações</th>
+                <th>Managers</th>
+                <th>Trained</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {equipamentos.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', color: '#999', padding: '2rem' }}>
-                    Nenhum equipamento cadastrado
+                    No equipment registered
                   </td>
                 </tr>
               ) : (
@@ -282,7 +281,7 @@ export default function SettingsPage() {
                         {eq.sopLink ? (
                           <a href={eq.sopLink} target="_blank" rel="noopener noreferrer"
                             style={{ color: '#3498db', textDecoration: 'underline' }}>
-                            Ver SOP
+                            View SOP
                           </a>
                         ) : '—'}
                       </td>
@@ -312,7 +311,7 @@ export default function SettingsPage() {
                               setAuthForm({ userId: '', tipo: 'TREINADO' });
                             }}
                           >
-                            👥 Autorizações
+                            👥 Authorizations
                           </button>
                           <button
                             className="button"
@@ -322,7 +321,7 @@ export default function SettingsPage() {
                               setShowEditModal(eq);
                             }}
                           >
-                            ✏️ Editar
+                            ✏️ Edit
                           </button>
                           <button
                             className="button button-danger"
@@ -345,23 +344,23 @@ export default function SettingsPage() {
         {showCreateModal && (
           <div className="modal" onClick={() => setShowCreateModal(false)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '550px' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Novo Equipamento</h3>
+              <h3 style={{ marginBottom: '1.5rem' }}>New Equipment</h3>
               <div className="form-group">
-                <label>Nome *</label>
-                <input value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} placeholder="Ex: FTIR, DSC, TGA..." />
+                <label>Name *</label>
+                <input value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} placeholder="e.g. FTIR, DSC, TGA..." />
               </div>
               <div className="form-group">
-                <label>Descrição</label>
-                <textarea value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} rows={3} placeholder="Descrição do equipamento" />
+                <label>Description</label>
+                <textarea value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} rows={3} placeholder="Equipment description" />
               </div>
               <div className="form-group">
-                <label>Link do SOP</label>
+                <label>SOP Link</label>
                 <input value={formData.sopLink} onChange={(e) => setFormData({ ...formData, sopLink: e.target.value })} placeholder="https://..." />
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button className="button button-secondary" onClick={() => setShowCreateModal(false)}>Cancelar</button>
+                <button className="button button-secondary" onClick={() => setShowCreateModal(false)}>Cancel</button>
                 <button className="button button-primary" onClick={handleCreateEquipamento} disabled={saving}>
-                  {saving ? 'Salvando...' : 'Criar'}
+                  {saving ? 'Saving...' : 'Create'}
                 </button>
               </div>
             </div>
@@ -372,23 +371,23 @@ export default function SettingsPage() {
         {showEditModal && (
           <div className="modal" onClick={() => setShowEditModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '550px' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Editar Equipamento</h3>
+              <h3 style={{ marginBottom: '1.5rem' }}>Edit Equipment</h3>
               <div className="form-group">
-                <label>Nome *</label>
+                <label>Name *</label>
                 <input value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} />
               </div>
               <div className="form-group">
-                <label>Descrição</label>
+                <label>Description</label>
                 <textarea value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} rows={3} />
               </div>
               <div className="form-group">
-                <label>Link do SOP</label>
+                <label>SOP Link</label>
                 <input value={formData.sopLink} onChange={(e) => setFormData({ ...formData, sopLink: e.target.value })} />
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button className="button button-secondary" onClick={() => setShowEditModal(null)}>Cancelar</button>
+                <button className="button button-secondary" onClick={() => setShowEditModal(null)}>Cancel</button>
                 <button className="button button-primary" onClick={handleUpdateEquipamento} disabled={saving}>
-                  {saving ? 'Salvando...' : 'Salvar'}
+                  {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>
@@ -399,54 +398,54 @@ export default function SettingsPage() {
         {showAuthModal && (
           <div className="modal" onClick={() => setShowAuthModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px' }}>
-              <h3 style={{ marginBottom: '1rem' }}>👥 Autorizações - {showAuthModal.nome}</h3>
+              <h3 style={{ marginBottom: '1rem' }}>👥 Authorizations - {showAuthModal.nome}</h3>
               <p style={{ color: '#666', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-                <strong>Responsável:</strong> Pode gerenciar o equipamento e suas autorizações.<br />
-                <strong>Treinado:</strong> Pode agendar o equipamento.
+                <strong>Manager:</strong> Can manage the equipment and its authorizations.<br />
+                <strong>Trained:</strong> Can book the equipment.
               </p>
 
               {/* Add authorization */}
               <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div style={{ flex: 2, minWidth: '200px' }}>
-                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500, fontSize: '0.85rem' }}>Usuário</label>
+                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500, fontSize: '0.85rem' }}>User</label>
                   <select
                     value={authForm.userId}
                     onChange={(e) => setAuthForm({ ...authForm, userId: e.target.value })}
                     style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
                   >
-                    <option value="">Selecione...</option>
+                    <option value="">Select...</option>
                     {approvedUsers.map((u) => (
                       <option key={u.id} value={u.id}>{u.name || u.email}</option>
                     ))}
                   </select>
                 </div>
                 <div style={{ flex: 1, minWidth: '150px' }}>
-                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500, fontSize: '0.85rem' }}>Tipo</label>
+                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500, fontSize: '0.85rem' }}>Type</label>
                   <select
                     value={authForm.tipo}
                     onChange={(e) => setAuthForm({ ...authForm, tipo: e.target.value as any })}
                     style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
                   >
-                    <option value="TREINADO">Treinado</option>
-                    <option value="RESPONSAVEL">Responsável</option>
+                    <option value="TREINADO">Trained</option>
+                    <option value="RESPONSAVEL">Manager</option>
                   </select>
                 </div>
                 <button className="button button-success" onClick={handleAddAuth} disabled={saving} style={{ padding: '8px 16px' }}>
-                  {saving ? '...' : '+ Adicionar'}
+                  {saving ? '...' : '+ Add'}
                 </button>
               </div>
 
               {/* Current authorizations */}
               <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                 {showAuthModal.autorizacoes.length === 0 ? (
-                  <p style={{ textAlign: 'center', color: '#999', padding: '1rem' }}>Nenhuma autorização</p>
+                  <p style={{ textAlign: 'center', color: '#999', padding: '1rem' }}>No authorizations</p>
                 ) : (
                   <table className="table" style={{ fontSize: '0.9rem' }}>
                     <thead>
                       <tr>
-                        <th>Usuário</th>
-                        <th>Tipo</th>
-                        <th>Ação</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -458,7 +457,7 @@ export default function SettingsPage() {
                               background: auth.tipo === 'RESPONSAVEL' ? '#e8f5e9' : '#e3f2fd',
                               color: auth.tipo === 'RESPONSAVEL' ? '#2e7d32' : '#1565c0',
                             }}>
-                              {auth.tipo === 'RESPONSAVEL' ? '🔑 Responsável' : '✅ Treinado'}
+                              {auth.tipo === 'RESPONSAVEL' ? '🔑 Manager' : '✅ Trained'}
                             </span>
                           </td>
                           <td>
@@ -467,7 +466,7 @@ export default function SettingsPage() {
                               style={{ padding: '4px 10px', fontSize: '0.8rem' }}
                               onClick={() => handleRemoveAuth(auth.id)}
                             >
-                              Remover
+                              Remove
                             </button>
                           </td>
                         </tr>
@@ -478,7 +477,7 @@ export default function SettingsPage() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                <button className="button button-secondary" onClick={() => setShowAuthModal(null)}>Fechar</button>
+                <button className="button button-secondary" onClick={() => setShowAuthModal(null)}>Close</button>
               </div>
             </div>
           </div>
