@@ -5,10 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
+import {
+  Calendar as RBCalendar,
+  dateFnsLocalizer,
+  Views,
+} from 'react-big-calendar';
+import type { CalendarProps } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+// Cast to avoid refs type mismatch between @types/react-big-calendar and @types/react@18
+const Calendar = RBCalendar as React.ComponentType<CalendarProps>;
 
 const locales = { 'pt-BR': ptBR };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
@@ -158,7 +166,7 @@ export default function AgendamentosPage() {
     });
   }, [agendamentos]);
 
-  const eventStyleGetter = (event: AgendamentoEvent) => {
+  const eventStyleGetter = (event: any) => {
     const color = equipColorMap[event.resource?.equipamentoId] || '#3498db';
     return {
       style: {
@@ -172,7 +180,7 @@ export default function AgendamentosPage() {
     };
   };
 
-  const handleSelectSlot = (slotInfo: any) => {
+  const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
     const start = slotInfo.start as Date;
     const end = slotInfo.end as Date;
     // Format for datetime-local
@@ -194,7 +202,7 @@ export default function AgendamentosPage() {
     setShowModal(true);
   };
 
-  const handleSelectEvent = (event: AgendamentoEvent) => {
+  const handleSelectEvent = (event: any) => {
     setShowDetailModal(event.resource);
   };
 
