@@ -42,7 +42,7 @@ export default function ResiduosPage() {
           setTotal(Array.isArray(residuos) ? residuos.length : 0);
         }
       } catch (error) {
-        console.error('Erro ao carregar resíduos:', error);
+        console.error('Error loading waste records:', error);
       } finally {
         setLoading(false);
       }
@@ -54,7 +54,7 @@ export default function ResiduosPage() {
   }, [session]);
 
   if (status === 'loading' || loading) {
-    return <div style={{ padding: '2rem' }}>Carregando...</div>;
+    return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
 
   return (
@@ -69,19 +69,19 @@ export default function ResiduosPage() {
           </div>
           <nav className="nav-tabs">
             <Link href="/dashboard">Dashboard</Link>
-            <Link href="/residuos">Resíduos</Link>
-            <Link href="/residuos/cadastro">Cadastro</Link>
-            <Link href="/residuos/campanha">Campanha</Link>
+            <Link href="/residuos">Waste</Link>
+            <Link href="/residuos/cadastro">Register</Link>
+            <Link href="/residuos/campanha">Campaign</Link>
           </nav>
           <div className="user-menu">
             <span>{user?.name || user?.email}</span>
-            <button onClick={() => router.push('/api/auth/signout')}>Sair</button>
+            <button onClick={() => router.push('/api/auth/signout')}>Sign Out</button>
           </div>
         </div>
       </header>
 
       <main className="container">
-        <h2 className="page-title">Gestão de Resíduos</h2>
+        <h2 className="page-title">Waste Management</h2>
 
         <div
           style={{
@@ -91,9 +91,9 @@ export default function ResiduosPage() {
             borderRadius: '4px',
           }}
         >
-          <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>📦 Resumo</h3>
+          <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>📦 Summary</h3>
           <p style={{ margin: 0, color: '#2c3e50' }}>
-            Total de frascos cadastrados: <strong>{total}</strong>
+            Total registered bottles: <strong>{total}</strong>
           </p>
         </div>
 
@@ -101,14 +101,14 @@ export default function ResiduosPage() {
           <div className="card card-blue" style={{ cursor: 'default' }}>
             <div className="card-header">
               <span className="card-icon">🧪</span>
-              <span>Cadastro de Frascos</span>
+              <span>Bottle Registration</span>
             </div>
             <p style={{ margin: 0, color: '#555' }}>
-              Registre novos frascos com composição detalhada e gere a etiqueta interna em PDF.
+              Register new bottles with detailed composition and generate the internal label in PDF.
             </p>
             <div>
               <Link href="/residuos/cadastro">
-                <button className="button button-primary">Ir para cadastro</button>
+                <button className="button button-primary">Go to registration</button>
               </Link>
             </div>
           </div>
@@ -116,14 +116,14 @@ export default function ResiduosPage() {
           <div className="card card-purple" style={{ cursor: 'default' }}>
             <div className="card-header">
               <span className="card-icon">📋</span>
-              <span>Campanha de Recolhimento</span>
+              <span>Collection Campaign</span>
             </div>
             <p style={{ margin: 0, color: '#555' }}>
-              Selecione frascos, informe volume atual e gere planilha + etiquetas da campanha.
+              Select bottles, enter current volume and generate spreadsheet + campaign labels.
             </p>
             <div>
               <Link href="/residuos/campanha">
-                <button className="button button-primary">Ir para campanha</button>
+                <button className="button button-primary">Go to campaign</button>
               </Link>
             </div>
           </div>

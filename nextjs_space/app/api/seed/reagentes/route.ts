@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
         .map((e: { codigoInterno: string }) => e.codigoInterno)
     );
 
-    let sucessos = 0;
-    let erros = 0;
-    const errosDetalhados: { reagente: string; erro: string }[] = [];
+    let successes = 0;
+    let errors = 0;
+    const errorsDetalhados: { reagente: string; erro: string }[] = [];
 
     for (let i = 0; i < seedData.length; i++) {
       const r = seedData[i];
@@ -115,10 +115,10 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        sucessos++;
+        successes++;
       } catch (error: any) {
-        erros++;
-        errosDetalhados.push({
+        errors++;
+        errorsDetalhados.push({
           reagente: r.nome || `Item ${i}`,
           erro: error.message
         });
@@ -130,17 +130,17 @@ export async function POST(request: NextRequest) {
     const totalReagentes = await prisma.reagente.count();
     const totalEntradas = await prisma.reagenteEntrada.count();
 
-    console.log(`[SEED] Done - Success: ${sucessos}, Errors: ${erros}`);
+    console.log(`[SEED] Done - Success: ${successes}, Errors: ${errors}`);
     console.log(`[SEED] DB state - Reagente: ${totalReagentes}, ReagenteEntrada: ${totalEntradas}`);
 
     return NextResponse.json({
       success: true,
-      message: `Importação concluída: ${sucessos} sucessos, ${erros} erros`,
-      sucessos,
-      erros,
+      message: `Import completed: ${successes} successes, ${errors} errors`,
+      successes,
+      errors,
       totalReagentes,
       totalEntradas,
-      errosDetalhados: erros > 0 ? errosDetalhados : undefined
+      errorsDetalhados: errors > 0 ? errorsDetalhados : undefined
     });
 
   } catch (error: any) {

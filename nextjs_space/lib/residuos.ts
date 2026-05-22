@@ -20,7 +20,7 @@ export const CLASSE_RESIDUO_LABEL: Record<ClasseResiduoValue, string> = {
   CS: "CS",
   OF: "OF",
   OM: "OM",
-  INORGANICO: "Inorgânico",
+  INORGANICO: "Inorganic",
 };
 
 export interface ResiduoPayload {

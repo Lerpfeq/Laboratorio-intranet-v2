@@ -77,7 +77,7 @@ export default function DashboardPage() {
                 <Link href="/reagentes">Reagent</Link>
                 {(isPosGraduando || isAdmin) && <Link href="/agendamentos">Calendar</Link>}
                 {(isPosGraduando || isAdmin) && <Link href="/residuos">Waste</Link>}
-                <Link href="/amostras">Samples Seletion</Link>
+                <Link href="/amostras">Samples</Link>
                 <Link href="/removedor-bg">Image</Link>
                 {isAdmin && <Link href="/admin">Admin</Link>}
               </>
@@ -89,7 +89,7 @@ export default function DashboardPage() {
               onClick={() => router.push('/api/auth/signout')}
               style={{ cursor: 'pointer' }}
             >
-              Sair
+              Sign Out
             </button>
           </div>
         </div>

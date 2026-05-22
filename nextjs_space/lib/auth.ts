@@ -16,7 +16,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Credenciais inválidas");
+          throw new Error("Invalid credentials");
         }
 
         const user = await prisma.user.findUnique({
@@ -24,7 +24,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user?.password) {
-          throw new Error("Usuário não encontrado");
+          throw new Error("User not found");
         }
 
         const isValid = await bcryptjs.compare(
@@ -33,11 +33,11 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isValid) {
-          throw new Error("Senha incorreta");
+          throw new Error("Incorrect password");
         }
 
         if (user.status !== "approved") {
-          throw new Error("Sua conta ainda não foi aprovada por um administrador");
+          throw new Error("Your account has not yet been approved by an administrator");
         }
 
         return {

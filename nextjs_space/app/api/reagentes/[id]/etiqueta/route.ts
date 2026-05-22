@@ -14,15 +14,15 @@ export async function GET(
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (user?.category === "IC") {
-      return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+      return NextResponse.json({ error: "No permission" }, { status: 403 });
     }
 
-    // Reemissão deve usar um frasco específico (ReagenteEntrada), não o último da família
+    // Reissue must use a specific bottle (ReagenteEntrada), not the last one in the family
     const entrada = await prisma.reagenteEntrada.findUnique({
       where: { id: params.id },
       include: { reagente: true },
@@ -30,12 +30,12 @@ export async function GET(
 
     if (!entrada) {
       return NextResponse.json(
-        { error: "Frasco não encontrado" },
+        { error: "Bottle not found" },
         { status: 404 }
       );
     }
 
-    // Mantém EXATAMENTE o mesmo payload usado no POST de entrada (/api/reagentes)
+    // Keep EXACTLY the same payload usado no POST de entrada (/api/reagentes)
     const etiquetaPayload = {
       nome: entrada.reagente.nome,
       codigoInterno: entrada.codigoInterno,

@@ -39,7 +39,7 @@ export default function AgendamentoPage() {
   };
 
   if (status === 'loading' || loading) {
-    return <div style={{ padding: '2rem' }}>Carregando...</div>;
+    return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
 
   return (
@@ -54,20 +54,20 @@ export default function AgendamentoPage() {
           </div>
           <nav className="nav-tabs">
             <Link href="/dashboard">Dashboard</Link>
-            <Link href="/agendamento">Agendamento</Link>
+            <Link href="/agendamento">Booking</Link>
           </nav>
           <div className="user-menu">
             <span>{user?.name}</span>
-            <button onClick={() => router.push('/api/auth/signout')}>Sair</button>
+            <button onClick={() => router.push('/api/auth/signout')}>Sign Out</button>
           </div>
         </div>
       </header>
 
       <main className="container">
-        <h2 className="page-title">Agendamento de Equipamentos</h2>
-        <p style={{ color: '#666', marginBottom: '2rem' }}>Sistema de agendamento em desenvolvimento. Volte em breve!</p>
+        <h2 className="page-title">Equipment Booking</h2>
+        <p style={{ color: '#666', marginBottom: '2rem' }}>Booking system under development. Check back soon!</p>
         <Link href="/dashboard" style={{ textDecoration: 'none' }}>
-          <button className="button button-primary">Voltar ao Dashboard</button>
+          <button className="button button-primary">Back to Dashboard</button>
         </Link>
       </main>
     </div>

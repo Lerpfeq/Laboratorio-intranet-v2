@@ -69,7 +69,7 @@ export default function CadastroResiduoPage() {
     async function fetchUser() {
       try {
         const response = await fetch('/api/auth/me');
-        if (!response.ok) throw new Error('Falha ao carregar usuário');
+        if (!response.ok) throw new Error('Failed to load user');
         const data = await response.json();
         setUser(data);
         setForm((prev) => ({
@@ -77,7 +77,7 @@ export default function CadastroResiduoPage() {
           responsavel: data?.name || data?.email || '',
         }));
       } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
+        console.error('Error loading user:', error);
       } finally {
         setLoadingUser(false);
       }
@@ -120,11 +120,11 @@ export default function CadastroResiduoPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || 'Falha ao cadastrar resíduo');
+        throw new Error(data?.error || 'Failed to register waste');
       }
 
       downloadBase64(data.etiquetaPdfBase64, data.etiquetaFileName, 'application/pdf');
-      setMessage(`Resíduo #${data.residuo.numeroRecipiente} cadastrado com sucesso e etiqueta gerada.`);
+      setMessage(`Waste #${data.residuo.numeroRecipiente} registered successfully and label generated.`);
 
       setForm((prev) => ({
         ...prev,
@@ -141,14 +141,14 @@ export default function CadastroResiduoPage() {
         aminas: false,
       }));
     } catch (error: any) {
-      setMessage(error?.message || 'Erro ao cadastrar resíduo');
+      setMessage(error?.message || 'Error registering waste');
     } finally {
       setSaving(false);
     }
   };
 
   if (status === 'loading' || loadingUser) {
-    return <div style={{ padding: '2rem' }}>Carregando...</div>;
+    return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
 
   return (
@@ -163,19 +163,19 @@ export default function CadastroResiduoPage() {
           </div>
           <nav className="nav-tabs">
             <Link href="/dashboard">Dashboard</Link>
-            <Link href="/residuos">Resíduos</Link>
-            <Link href="/residuos/cadastro">Cadastro</Link>
-            <Link href="/residuos/campanha">Campanha</Link>
+            <Link href="/residuos">Waste</Link>
+            <Link href="/residuos/cadastro">Register</Link>
+            <Link href="/residuos/campanha">Campaign</Link>
           </nav>
           <div className="user-menu">
             <span>{user?.name || user?.email}</span>
-            <button onClick={() => router.push('/api/auth/signout')}>Sair</button>
+            <button onClick={() => router.push('/api/auth/signout')}>Sign Out</button>
           </div>
         </div>
       </header>
 
       <main className="container">
-        <h2 className="page-title">Cadastro de Resíduo</h2>
+        <h2 className="page-title">Waste Registration</h2>
 
         <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', borderBottom: '2px solid #e0e0e0' }}>
           <Link href="/residuos/cadastro">
@@ -189,7 +189,7 @@ export default function CadastroResiduoPage() {
                 borderRadius: '4px 4px 0 0',
               }}
             >
-              Cadastro
+              Register
             </button>
           </Link>
           <Link href="/residuos/campanha">
@@ -203,14 +203,14 @@ export default function CadastroResiduoPage() {
                 borderRadius: '4px 4px 0 0',
               }}
             >
-              Campanha
+              Campaign
             </button>
           </Link>
         </div>
 
         <form onSubmit={handleSubmit} style={{ maxWidth: '900px', margin: '0 auto' }}>
           <div className="form-group">
-            <label>Composição *</label>
+            <label>Composition *</label>
             <textarea
               value={form.composicao}
               onChange={(event) => setForm((prev) => ({ ...prev, composicao: event.target.value }))}
@@ -221,7 +221,7 @@ export default function CadastroResiduoPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label>Classe *</label>
+              <label>Class *</label>
               <select
                 value={form.classe}
                 onChange={(event) => setForm((prev) => ({ ...prev, classe: event.target.value }))}
@@ -233,37 +233,37 @@ export default function CadastroResiduoPage() {
                 <option value="CS">CS</option>
                 <option value="OF">OF</option>
                 <option value="OM">OM</option>
-                <option value="INORGANICO">Inorgânico</option>
+                <option value="INORGANICO">Inorganic</option>
               </select>
             </div>
 
             <div className="form-group">
-              <label>Estado *</label>
+              <label>State *</label>
               <select
                 value={form.estado}
                 onChange={(event) => setForm((prev) => ({ ...prev, estado: event.target.value }))}
                 required
               >
-                <option value="S">Sólido (S)</option>
-                <option value="L">Líquido (L)</option>
+                <option value="S">Solid (S)</option>
+                <option value="L">Liquid (L)</option>
               </select>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label>Tipo de Recipiente *</label>
+              <label>Container Type *</label>
               <input
                 type="text"
                 value={form.tipoRecipiente}
                 onChange={(event) => setForm((prev) => ({ ...prev, tipoRecipiente: event.target.value }))}
-                placeholder="Ex.: Frasco de vidro"
+                placeholder="E.g.: Glass bottle"
                 required
               />
             </div>
 
             <div className="form-group">
-              <label>Volume do Recipiente (L) *</label>
+              <label>Container Volume (L) *</label>
               <input
                 type="number"
                 min="0"
@@ -277,7 +277,7 @@ export default function CadastroResiduoPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label>Responsável *</label>
+              <label>Responsible *</label>
               <input
                 type="text"
                 value={form.responsavel}
@@ -287,7 +287,7 @@ export default function CadastroResiduoPage() {
             </div>
 
             <div className="form-group">
-              <label>Departamento *</label>
+              <label>Department *</label>
               <input
                 type="text"
                 value={form.departamento}
@@ -299,7 +299,7 @@ export default function CadastroResiduoPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label>Data *</label>
+              <label>Date *</label>
               <input
                 type="date"
                 value={form.data}
@@ -322,7 +322,7 @@ export default function CadastroResiduoPage() {
           </div>
 
           <div className="form-group">
-            <label>Observações</label>
+            <label>Notes</label>
             <textarea
               value={form.observacoes}
               onChange={(event) => setForm((prev) => ({ ...prev, observacoes: event.target.value }))}
@@ -339,11 +339,11 @@ export default function CadastroResiduoPage() {
             }}
           >
             <div style={{ background: '#ecf0f1', padding: '0.75rem 1rem', fontWeight: 600 }}>
-              Tabela de Composição (%)
+              Composition Table (%)
             </div>
             <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label>Halogenados %</label>
+                <label>Halogenated %</label>
                 <input
                   type="number"
                   min="0"
@@ -357,7 +357,7 @@ export default function CadastroResiduoPage() {
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
-                <label>Acetonitrila %</label>
+                <label>Acetonitrile %</label>
                 <input
                   type="number"
                   min="0"
@@ -371,7 +371,7 @@ export default function CadastroResiduoPage() {
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
-                <label>Metais Pesados %</label>
+                <label>Heavy Metals %</label>
                 <input
                   type="number"
                   min="0"
@@ -395,7 +395,7 @@ export default function CadastroResiduoPage() {
             }}
           >
             <div style={{ background: '#ecf0f1', padding: '0.75rem 1rem', fontWeight: 600 }}>
-              Checkboxes de Segurança
+              Safety Checkboxes
             </div>
             <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -404,7 +404,7 @@ export default function CadastroResiduoPage() {
                   checked={form.presencaEnxofre}
                   onChange={(event) => setForm((prev) => ({ ...prev, presencaEnxofre: event.target.checked }))}
                 />
-                Presença de enxofre ou substâncias sulfuradas
+                Presence of sulfur or sulfurated substances
               </label>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -413,7 +413,7 @@ export default function CadastroResiduoPage() {
                   checked={form.geradorCianetos}
                   onChange={(event) => setForm((prev) => ({ ...prev, geradorCianetos: event.target.checked }))}
                 />
-                Gerador de cianetos
+                Cyanide generator
               </label>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -422,17 +422,17 @@ export default function CadastroResiduoPage() {
                   checked={form.aminas}
                   onChange={(event) => setForm((prev) => ({ ...prev, aminas: event.target.checked }))}
                 />
-                Aminas
+                Amines
               </label>
             </div>
           </div>
 
           <button type="submit" disabled={saving} className="button button-primary">
-            {saving ? 'Processando...' : '🏷️ Cadastrar e Gerar Etiqueta PDF'}
+            {saving ? 'Processing...' : '🏷️ Register and Generate Label PDF'}
           </button>
 
           {message && (
-            <div className={message.includes('sucesso') ? 'success-message' : 'error-message'}>
+            <div className={message.includes('successfully') ? 'success-message' : 'error-message'}>
               {message}
             </div>
           )}

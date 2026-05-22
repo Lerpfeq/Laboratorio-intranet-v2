@@ -72,12 +72,12 @@ export default function CampanhaResiduosPage() {
     async function fetchUser() {
       try {
         const response = await fetch('/api/auth/me');
-        if (!response.ok) throw new Error('Falha ao carregar usuário');
+        if (!response.ok) throw new Error('Failed to load user');
         const data = await response.json();
         setUser(data);
         setResponsavelInformacoes(data?.name || data?.email || '');
       } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
+        console.error('Error loading user:', error);
       } finally {
         setLoadingUser(false);
       }
@@ -92,14 +92,14 @@ export default function CampanhaResiduosPage() {
       const response = await fetch('/api/residuos');
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || 'Erro ao listar resíduos');
+        throw new Error(data?.error || 'Error listing waste records');
       }
       setResiduos(data);
       if (data.length > 0) {
         setDepartamento((prev) => prev || data[0]?.departamento || '');
       }
     } catch (error) {
-      console.error('Erro ao listar resíduos:', error);
+      console.error('Error listing waste records:', error);
     } finally {
       setLoadingRows(false);
     }
@@ -133,7 +133,7 @@ export default function CampanhaResiduosPage() {
     setMessage('');
 
     if (selectedOrder.length === 0) {
-      setMessage('Selecione ao menos um frasco para a campanha.');
+      setMessage('Select at least one bottle for the campaign.');
       return;
     }
 
@@ -143,7 +143,7 @@ export default function CampanhaResiduosPage() {
     }));
 
     if (itens.some((item) => !Number.isFinite(item.volumeAtualLitros) || item.volumeAtualLitros < 0)) {
-      setMessage('Informe um volume atual válido (em L) para todos os frascos selecionados.');
+      setMessage('Enter a valid current volume (in L) for all selected bottles.');
       return;
     }
 
@@ -164,7 +164,7 @@ export default function CampanhaResiduosPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || 'Falha ao processar campanha');
+        throw new Error(data?.error || 'Failed to process campaign');
       }
 
       downloadBase64(
@@ -179,21 +179,21 @@ export default function CampanhaResiduosPage() {
       );
 
       setMessage(
-        `Campanha concluída: ${data.totalItens} frascos processados, planilha e etiquetas geradas, e itens removidos da base.`
+        `Campaign completed: ${data.totalItens} bottles processed, spreadsheet and labels generated, and items removed from database.`
       );
 
       setSelectedOrder([]);
       setVolumeAtual({});
       await loadResiduos();
     } catch (error: any) {
-      setMessage(error?.message || 'Erro ao processar campanha');
+      setMessage(error?.message || 'Error processing campaign');
     } finally {
       setProcessing(false);
     }
   };
 
   if (status === 'loading' || loadingUser) {
-    return <div style={{ padding: '2rem' }}>Carregando...</div>;
+    return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
 
   return (
@@ -208,19 +208,19 @@ export default function CampanhaResiduosPage() {
           </div>
           <nav className="nav-tabs">
             <Link href="/dashboard">Dashboard</Link>
-            <Link href="/residuos">Resíduos</Link>
-            <Link href="/residuos/cadastro">Cadastro</Link>
-            <Link href="/residuos/campanha">Campanha</Link>
+            <Link href="/residuos">Waste</Link>
+            <Link href="/residuos/cadastro">Register</Link>
+            <Link href="/residuos/campanha">Campaign</Link>
           </nav>
           <div className="user-menu">
             <span>{user?.name || user?.email}</span>
-            <button onClick={() => router.push('/api/auth/signout')}>Sair</button>
+            <button onClick={() => router.push('/api/auth/signout')}>Sign Out</button>
           </div>
         </div>
       </header>
 
       <main className="container">
-        <h2 className="page-title">Campanha de Recolhimento</h2>
+        <h2 className="page-title">Collection Campaign</h2>
 
         <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', borderBottom: '2px solid #e0e0e0' }}>
           <Link href="/residuos/cadastro">
@@ -234,7 +234,7 @@ export default function CampanhaResiduosPage() {
                 borderRadius: '4px 4px 0 0',
               }}
             >
-              Cadastro
+              Register
             </button>
           </Link>
           <Link href="/residuos/campanha">
@@ -248,7 +248,7 @@ export default function CampanhaResiduosPage() {
                 borderRadius: '4px 4px 0 0',
               }}
             >
-              Campanha
+              Campaign
             </button>
           </Link>
         </div>
@@ -265,7 +265,7 @@ export default function CampanhaResiduosPage() {
           }}
         >
           <div className="form-group" style={{ margin: 0 }}>
-            <label>Departamento</label>
+            <label>Department</label>
             <input
               type="text"
               value={departamento}
@@ -274,7 +274,7 @@ export default function CampanhaResiduosPage() {
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>
-            <label>Responsável pelas informações</label>
+            <label>Responsible for information</label>
             <input
               type="text"
               value={responsavelInformacoes}
@@ -283,7 +283,7 @@ export default function CampanhaResiduosPage() {
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>
-            <label>Data</label>
+            <label>Date</label>
             <input
               type="date"
               value={dataCampanha}
@@ -293,24 +293,24 @@ export default function CampanhaResiduosPage() {
         </div>
 
         {loadingRows ? (
-          <div style={{ textAlign: 'center', padding: '2rem' }}>Carregando frascos...</div>
+          <div style={{ textAlign: 'center', padding: '2rem' }}>Loading bottles...</div>
         ) : residuos.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2rem', color: '#7f8c8d' }}>
-            Não há frascos cadastrados no momento.
+            No bottles registered at the moment.
           </div>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Selecionar</th>
-                <th>Ordinal</th>
-                <th>Nº Recipiente</th>
-                <th>Composição</th>
-                <th>Classe</th>
-                <th>Estado</th>
-                <th>Tipo Recipiente</th>
-                <th>Volume Atual (L)</th>
-                <th>Volume Recipiente (L)</th>
+                <th>Select</th>
+                <th>Order</th>
+                <th>Container #</th>
+                <th>Composition</th>
+                <th>Class</th>
+                <th>State</th>
+                <th>Container Type</th>
+                <th>Current Volume (L)</th>
+                <th>Container Volume (L)</th>
               </tr>
             </thead>
             <tbody>
@@ -364,17 +364,17 @@ export default function CampanhaResiduosPage() {
             onClick={processarCampanha}
             className="button button-primary"
           >
-            {processing ? 'Processando...' : 'Gerar planilha + etiquetas e finalizar campanha'}
+            {processing ? 'Processing...' : 'Generate spreadsheet + labels and finalize campaign'}
           </button>
           <p style={{ margin: 0, color: '#7f8c8d', fontSize: '0.95rem' }}>
-            A numeração ordinal reinicia em 1 a cada campanha.
+            The ordinal numbering restarts at 1 for each campaign.
           </p>
         </div>
 
         {message && (
           <div
             className={
-              message.includes('concluída') || message.includes('geradas') ? 'success-message' : 'error-message'
+              message.includes('completed') || message.includes('generated') ? 'success-message' : 'error-message'
             }
             style={{ marginTop: '0.75rem' }}
           >

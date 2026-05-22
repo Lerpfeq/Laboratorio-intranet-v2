@@ -36,11 +36,11 @@ function normalizeCampanhaPayload(body: any): CampanhaPayload {
 
 async function getAuthedUser() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return { error: "Não autenticado", status: 401 as const };
+  if (!session?.user?.id) return { error: "Unauthorized", status: 401 as const };
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!user) return { error: "Usuário não encontrado", status: 404 as const };
-  if (user.category === "IC") return { error: "Permissão negada", status: 403 as const };
+  if (!user) return { error: "User not found", status: 404 as const };
+  if (user.category === "IC") return { error: "Permission denied", status: 403 as const };
 
   return { session, user };
 }
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     const invalidVolume = payload.itens.find((item) => item.volumeAtualLitros < 0);
     if (invalidVolume) {
-      return NextResponse.json({ error: "Volume atual inválido para um ou mais itens" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid current volume for one or more items" }, { status: 400 });
     }
 
     const ids = payload.itens.map((item) => item.id);
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Um ou mais frascos não foram encontrados ou não pertencem ao usuário atual",
+            "One or more bottles were not found or do not belong to the current user",
         },
         { status: 404 }
       );
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     const selecionados = payload.itens.map((item) => {
       const residuo = byId.get(item.id);
       if (!residuo) {
-        throw new Error(`Resíduo ${item.id} não encontrado`);
+        throw new Error(`Waste record ${item.id} not found`);
       }
 
       return {
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     const departamento = payload.departamento || registros[0]?.departamento || "";
     const responsavel =
-      payload.responsavelInformacoes || auth.user.name || auth.user.email || "Não informado";
+      payload.responsavelInformacoes || auth.user.name || auth.user.email || "Not provided";
     const data = payload.data ? new Date(payload.data).toISOString() : new Date().toISOString();
 
     const planilhaBuffer = await gerarPlanilhaCampanha(residuosComOrdinal as any, {

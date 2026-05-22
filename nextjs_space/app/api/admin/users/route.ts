@@ -54,24 +54,24 @@ export async function PATCH(request: NextRequest) {
     const { userId, status, category } = body;
 
     if (!userId) {
-      return NextResponse.json({ error: "userId é obrigatório" }, { status: 400 });
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
     if (!status && !category) {
       return NextResponse.json(
-        { error: "Informe ao menos status ou categoria para atualização" },
+        { error: "Provide at least status or category to update" },
         { status: 400 }
       );
     }
 
     const validStatuses = ["pending", "approved"];
     if (status && !validStatuses.includes(status)) {
-      return NextResponse.json({ error: "Status inválido" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
     const validCategories = ["IC", "Pos-graduando", "Admin"];
     if (category && !validCategories.includes(category)) {
-      return NextResponse.json({ error: "Categoria inválida" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid category" }, { status: 400 });
     }
 
     const updatedUser = await prisma.user.update({

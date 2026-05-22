@@ -8,7 +8,7 @@ const execAsync = promisify(exec);
 
 export const maxDuration = 60;
 
-// Função para remover background usando rembg (GRATUITO)
+// Function to remove background using rembg (FREE)
 async function removeBackgroundWithRembg(inputPath: string, outputPath: string): Promise<void> {
   try {
     // Tentar usar rembg instalado via pip
@@ -17,12 +17,12 @@ async function removeBackgroundWithRembg(inputPath: string, outputPath: string):
       maxBuffer: 50 * 1024 * 1024 // 50MB buffer
     });
   } catch (error: any) {
-    // Se rembg não funcionar, tentar alternativa
+    // If rembg doesn't work, try alternative
     throw new Error(`rembg failed: ${error.message}`);
   }
 }
 
-// Função alternativa usando Remove.bg API (trial gratuito, depois pago)
+// Alternative function using Remove.bg API (free trial, then paid)
 async function removeBackgroundWithAPI(inputBuffer: Buffer): Promise<Buffer> {
   const REMOVE_BG_API_KEY = process.env.REMOVE_BG_API_KEY;
 
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     let base64: string;
 
     try {
-      // Tentar método 1: rembg (GRATUITO, local)
+      // Try method 1: rembg (FREE, local)
       console.log('[BG Removal] Trying rembg...');
       await removeBackgroundWithRembg(inputPath, outputPath);
       processedBuffer = await readFile(outputPath);
@@ -97,14 +97,14 @@ export async function POST(request: NextRequest) {
     } catch (rembgError: any) {
       console.log('[BG Removal] rembg failed:', rembgError.message);
 
-      // Método 2: Remove.bg API (trial gratuito, depois pago)
+      // Method 2: Remove.bg API (free trial, then paid)
       if (process.env.REMOVE_BG_API_KEY) {
         console.log('[BG Removal] Trying Remove.bg API...');
         processedBuffer = await removeBackgroundWithAPI(buffer);
         base64 = processedBuffer.toString('base64');
         console.log('[BG Removal] Success with Remove.bg API');
       } else {
-        // Se nenhum método funcionar
+        // If no method works
         return NextResponse.json({
           error: 'Background removal service not available',
           details: 'rembg is not installed and no Remove.bg API key is configured.',
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Limpar arquivos temporários
+    // Clean up temporary files
     if (inputPath) await unlink(inputPath).catch(() => {});
     if (outputPath) await unlink(outputPath).catch(() => {});
 
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
 // Health check
 export async function GET() {
   try {
-    // Verificar se rembg está disponível
+    // Check if rembg is available
     const { stdout } = await execAsync('python3 -c "import rembg; print(rembg.__version__)"', {
       timeout: 5000
     });
@@ -153,7 +153,7 @@ export async function GET() {
       cost: 'FREE'
     });
   } catch {
-    // Se rembg não está disponível
+    // If rembg is not available
     const hasAPIKey = !!process.env.REMOVE_BG_API_KEY;
 
     return NextResponse.json({

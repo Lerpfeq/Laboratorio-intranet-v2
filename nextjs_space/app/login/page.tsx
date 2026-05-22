@@ -50,7 +50,7 @@ export default function LoginPage() {
             <Image src="/logo.png" alt="LERP Logo" fill style={{ objectFit: 'contain' }} />
           </div>
           <h1 style={{ fontSize: '1.5rem', color: '#1a1a2e' }}>LERP Intranet</h1>
-          <p style={{ color: '#666', marginTop: '0.5rem' }}>Laboratório de Engenharia de Reações Poliméricas</p>
+          <p style={{ color: '#666', marginTop: '0.5rem' }}>Polymeric Reaction Engineering Laboratory</p>
         </div>
 
         {error && <div style={{ background: '#f8d7da', color: '#721c24', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
@@ -91,7 +91,7 @@ export default function LoginPage() {
 
         <div style={{ position: 'relative', margin: '2rem 0' }}>
           <hr style={{ border: 'none', borderTop: '1px solid #ddd' }} />
-          <span style={{ position: 'absolute', left: '50%', top: '-10px', transform: 'translateX(-50%)', background: 'white', padding: '0 0.5rem', color: '#666', fontSize: '0.85rem' }}>OU</span>
+          <span style={{ position: 'absolute', left: '50%', top: '-10px', transform: 'translateX(-50%)', background: 'white', padding: '0 0.5rem', color: '#666', fontSize: '0.85rem' }}>OR</span>
         </div>
 
         <button

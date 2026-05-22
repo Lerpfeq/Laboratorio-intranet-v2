@@ -11,7 +11,7 @@ export default function ReemitirEtiquetaPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function carregarReagente() {
+    async function loadReagent() {
       try {
         const response = await fetch(`/api/reagentes/${params.id}`);
         const data = await response.json();
@@ -20,23 +20,23 @@ export default function ReemitirEtiquetaPage() {
           setReagente(data.reagente);
         }
       } catch (error) {
-        console.error('Erro:', error);
+        console.error('Error:', error);
       } finally {
         setLoading(false);
       }
     }
 
     if (params?.id) {
-      carregarReagente();
+      loadReagent();
     }
   }, [params?.id]);
 
-  if (loading) return <div className="container">Carregando...</div>;
-  if (!reagente) return <div className="container">Reagente não encontrado</div>;
+  if (loading) return <div className="container">Loading...</div>;
+  if (!reagente) return <div className="container">Reagent not found</div>;
 
   return (
     <div className="container">
-      <h1>Reemissão de Etiqueta</h1>
+      <h1>Reissue Label</h1>
 
       <ReagenteLabelPreview
         reagente={reagente}

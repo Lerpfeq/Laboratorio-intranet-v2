@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(user);
   } catch (error: any) {
     return NextResponse.json(
-      { error: error?.message || "Erro ao buscar usuário" },
+      { error: error?.message || "Error fetching user" },
       { status: 500 }
     );
   }

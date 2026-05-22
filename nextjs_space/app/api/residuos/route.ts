@@ -39,26 +39,26 @@ function normalizeResiduoPayload(body: any): ResiduoPayload {
 }
 
 function validateResiduoPayload(payload: ResiduoPayload): string | null {
-  if (!payload.composicao) return "Composição é obrigatória";
-  if (!CLASSE_RESIDUO_VALUES.includes(payload.classe)) return "Classe inválida";
-  if (!ESTADO_RESIDUO_VALUES.includes(payload.estado)) return "Estado inválido";
-  if (!payload.tipoRecipiente) return "Tipo de recipiente é obrigatório";
+  if (!payload.composicao) return "Composition is required";
+  if (!CLASSE_RESIDUO_VALUES.includes(payload.classe)) return "Invalid class";
+  if (!ESTADO_RESIDUO_VALUES.includes(payload.estado)) return "Invalid state";
+  if (!payload.tipoRecipiente) return "Container type is required";
   if (!Number.isFinite(payload.volumeRecipienteLitros) || payload.volumeRecipienteLitros <= 0) {
     return "Volume do recipiente deve ser maior que zero";
   }
-  if (!payload.responsavel) return "Responsável é obrigatório";
-  if (!payload.departamento) return "Departamento é obrigatório";
+  if (!payload.responsavel) return "Responsible is required";
+  if (!payload.departamento) return "Department is required";
 
   return null;
 }
 
 async function getAuthedUser() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return { error: "Não autenticado", status: 401 as const };
+  if (!session?.user?.id) return { error: "Unauthorized", status: 401 as const };
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!user) return { error: "Usuário não encontrado", status: 404 as const };
-  if (user.category === "IC") return { error: "Permissão negada", status: 403 as const };
+  if (!user) return { error: "User not found", status: 404 as const };
+  if (user.category === "IC") return { error: "Permission denied", status: 403 as const };
 
   return { session, user };
 }
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(residuos);
   } catch (error: any) {
     console.error("GET /api/residuos error:", error);
-    return NextResponse.json({ error: error?.message || "Erro ao listar resíduos" }, { status: 500 });
+    return NextResponse.json({ error: error?.message || "Error listing waste records" }, { status: 500 });
   }
 }
 
@@ -167,6 +167,6 @@ export async function POST(request: NextRequest) {
     );
   } catch (error: any) {
     console.error("POST /api/residuos error:", error);
-    return NextResponse.json({ error: error?.message || "Erro ao criar resíduo" }, { status: 500 });
+    return NextResponse.json({ error: error?.message || "Error creating waste record" }, { status: 500 });
   }
 }

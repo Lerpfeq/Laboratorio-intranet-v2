@@ -4,7 +4,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'LERP - Intranet',
-  description: 'Sistema de Gestao - Laboratorio de Engenharia de Reacoes Poliméricas',
+  description: 'Management System - Polymeric Reaction Engineering Laboratory',
   icons: '/logo.png',
  };
 
@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="en">
       <head>
         <script src="https://apps.abacus.ai/chatllm/appllm-lib.js"></script>
       </head>

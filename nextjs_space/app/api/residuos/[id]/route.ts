@@ -43,11 +43,11 @@ function normalizeResiduoPayload(body: any): Partial<ResiduoPayload> {
 
 async function getAuthedUser() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return { error: "Não autenticado", status: 401 as const };
+  if (!session?.user?.id) return { error: "Unauthorized", status: 401 as const };
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!user) return { error: "Usuário não encontrado", status: 404 as const };
-  if (user.category === "IC") return { error: "Permissão negada", status: 403 as const };
+  if (!user) return { error: "User not found", status: 404 as const };
+  if (user.category === "IC") return { error: "Permission denied", status: 403 as const };
 
   return { session, user };
 }
@@ -61,21 +61,21 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     const existing = await prisma.registroResiduo.findUnique({ where: { id: params.id } });
     if (!existing) {
-      return NextResponse.json({ error: "Resíduo não encontrado" }, { status: 404 });
+      return NextResponse.json({ error: "Waste record not found" }, { status: 404 });
     }
 
     if (auth.user.category !== "Admin" && existing.usuarioId !== auth.user.id) {
-      return NextResponse.json({ error: "Permissão negada" }, { status: 403 });
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     const payload = normalizeResiduoPayload(await request.json());
 
     if (payload.classe && !CLASSE_RESIDUO_VALUES.includes(payload.classe)) {
-      return NextResponse.json({ error: "Classe inválida" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid class" }, { status: 400 });
     }
 
     if (payload.estado && !ESTADO_RESIDUO_VALUES.includes(payload.estado)) {
-      return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid state" }, { status: 400 });
     }
 
     const updated = await prisma.registroResiduo.update({
@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     return NextResponse.json(updated);
   } catch (error: any) {
     console.error("PUT /api/residuos/[id] error:", error);
-    return NextResponse.json({ error: error?.message || "Erro ao atualizar resíduo" }, { status: 500 });
+    return NextResponse.json({ error: error?.message || "Error updating waste record" }, { status: 500 });
   }
 }
 
@@ -126,11 +126,11 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     const existing = await prisma.registroResiduo.findUnique({ where: { id: params.id } });
     if (!existing) {
-      return NextResponse.json({ error: "Resíduo não encontrado" }, { status: 404 });
+      return NextResponse.json({ error: "Waste record not found" }, { status: 404 });
     }
 
     if (auth.user.category !== "Admin" && existing.usuarioId !== auth.user.id) {
-      return NextResponse.json({ error: "Permissão negada" }, { status: 403 });
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     await prisma.registroResiduo.delete({ where: { id: params.id } });
@@ -138,6 +138,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("DELETE /api/residuos/[id] error:", error);
-    return NextResponse.json({ error: error?.message || "Erro ao remover resíduo" }, { status: 500 });
+    return NextResponse.json({ error: error?.message || "Error removing waste record" }, { status: 500 });
   }
 }

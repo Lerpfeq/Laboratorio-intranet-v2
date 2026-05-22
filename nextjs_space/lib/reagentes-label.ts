@@ -74,7 +74,7 @@ async function loadLogoBytes(): Promise<Uint8Array | null> {
 export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
 
-  // Dimensões: 12cm x 5cm ~= 340 x 142 pt
+  // Dimensions: 12cm x 5cm ~= 340 x 142 pt
   const page = pdfDoc.addPage([340, 142]);
 
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -139,7 +139,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
 
   y -= 30; // Increased spacing so gray box doesn't overlap logo
 
-  // Caixa cinza com código interno (lowered to avoid logo overlap)
+  // Grey box with internal code (lowered to avoid logo overlap)
   const boxY = Math.min(y - 5, 60);
   page.drawRectangle({
     x: 10,
@@ -210,7 +210,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
     });
   }
 
-  // Rodapé
+  // Footer
   const entrada = formatDate(payload.dataEntrada, "en-US");
   const marcaLabel = payload.marca?.trim() || payload.fornecedor?.trim() || payload.fabricante?.trim() || "";
 
@@ -230,7 +230,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
     maxWidth: pageWidth - 30,
   });
 
-  // Marca d'água EXPIRED (centralizada e mais transparente)
+  // EXPIRED watermark (centered and more transparent)
   if (expirado) {
     page.drawRectangle({
       x: 0,
@@ -246,7 +246,7 @@ export async function gerarEtiquetaReagente(payload: ReagenteEtiquetaPayload): P
     const textWidth = fontBold.widthOfTextAtSize(expiredText, expiredFontSize);
     const textHeight = expiredFontSize;
 
-    // Centralização considerando rotação de -30 graus
+    // Centering considering -30 degree rotation
     const angleRad = (-30 * Math.PI) / 180;
     const centerX = pageWidth / 2;
     const centerY = pageHeight / 2;

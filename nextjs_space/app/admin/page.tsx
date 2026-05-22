@@ -90,12 +90,12 @@ export default function AdminPage() {
     }
 
     if (user.id === currentUser.id) {
-      alert('Você não pode excluir seu próprio usuário.');
+      alert('You cannot delete your own user account.');
       return;
     }
 
     const confirmed = window.confirm(
-      `Tem certeza que deseja excluir o usuário ${user.name || user.email || user.id}? Esta ação não pode ser desfeita.`
+      `Are you sure you want to delete user ${user.name || user.email || user.id}? This action cannot be undone.`
     );
 
     if (!confirmed) {
@@ -112,26 +112,26 @@ export default function AdminPage() {
       const payload = await res.json();
 
       if (!res.ok) {
-        alert(payload?.error || 'Não foi possível excluir o usuário.');
+        alert(payload?.error || 'Could not delete user.');
         return;
       }
 
       setUsers((prevUsers) => prevUsers.filter((item) => item.id !== user.id));
-      alert('Usuário excluído com sucesso.');
+      alert('User deleted successfully.');
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Erro inesperado ao excluir usuário.');
+      alert('Unexpected error deleting user.');
     } finally {
       setDeletingUserId(null);
     }
   };
 
   if (status === 'loading' || loading) {
-    return <div style={{ padding: '2rem' }}>Carregando...</div>;
+    return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
 
   if (!currentUser || currentUser.category !== 'Admin') {
-    return <div style={{ padding: '2rem' }}>Acesso negado</div>;
+    return <div style={{ padding: '2rem' }}>Access denied</div>;
   }
 
   return (
@@ -150,24 +150,24 @@ export default function AdminPage() {
           </nav>
           <div className="user-menu">
             <span>{currentUser?.name}</span>
-            <button onClick={() => router.push('/api/auth/signout')}>Sair</button>
+            <button onClick={() => router.push('/api/auth/signout')}>Sign Out</button>
           </div>
         </div>
       </header>
 
       <main className="container">
-        <h2 className="page-title">Painel de Administracao</h2>
+        <h2 className="page-title">Admin Panel</h2>
 
-        <h3 style={{ marginBottom: '1rem', marginTop: '2rem' }}>Gerenciar Usuarios</h3>
+        <h3 style={{ marginBottom: '1rem', marginTop: '2rem' }}>Manage Users</h3>
         <table className="table">
           <thead>
             <tr>
-              <th>Nome</th>
+              <th>Name</th>
               <th>Email</th>
-              <th>Categoria</th>
+              <th>Category</th>
               <th>Status</th>
-              <th>Data de Criacao</th>
-              <th>Acoes</th>
+              <th>Created</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -177,14 +177,14 @@ export default function AdminPage() {
                 <td>{user.email}</td>
                 <td>{user.category || '-'}</td>
                 <td><span className={`status-badge status-${user.status}`}>{user.status}</span></td>
-                <td>{new Date(user.createdAt).toLocaleDateString('pt-BR')}</td>
+                <td>{new Date(user.createdAt).toLocaleDateString('en-US')}</td>
                 <td>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <button
                       onClick={() => setSelectedUser(user.id)}
                       style={{ padding: '0.5rem', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                     >
-                      Editar
+                      Edit
                     </button>
                     <button
                       onClick={() => handleDeleteUser(user)}
@@ -198,9 +198,9 @@ export default function AdminPage() {
                         cursor: currentUser?.id === user.id ? 'not-allowed' : 'pointer',
                         opacity: deletingUserId === user.id ? 0.7 : 1,
                       }}
-                      title={currentUser?.id === user.id ? 'Você não pode excluir seu próprio usuário' : 'Excluir usuário'}
+                      title={currentUser?.id === user.id ? 'You cannot delete your own user account' : 'Delete user'}
                     >
-                      {deletingUserId === user.id ? 'Excluindo...' : 'Excluir'}
+                      {deletingUserId === user.id ? 'Deleting...' : 'Delete'}
                     </button>
                   </div>
                 </td>
@@ -212,17 +212,17 @@ export default function AdminPage() {
         {selectedUser && (
           <div className="modal" onClick={() => setSelectedUser(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <h3>Atualizar Usuario</h3>
+              <h3>Update User</h3>
               <div className="form-group">
                 <label>Status</label>
                 <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
-                  <option value="pending">Pendente</option>
-                  <option value="approved">Aprovado</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
                 </select>
               </div>
 
               <div className="form-group">
-                <label>Categoria</label>
+                <label>Category</label>
                 <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
                   <option value="IC">IC</option>
                   <option value="Pos-graduando">Pos-graduando</option>
@@ -235,14 +235,14 @@ export default function AdminPage() {
                   onClick={() => handleUpdateUser(selectedUser)}
                   className="button button-primary"
                 >
-                  Salvar
+                  Save
                 </button>
                 <button
                   onClick={() => setSelectedUser(null)}
                   className="button"
                   style={{ background: '#999', color: 'white', border: 'none' }}
                 >
-                  Cancelar
+                  Cancel
                 </button>
               </div>
             </div>

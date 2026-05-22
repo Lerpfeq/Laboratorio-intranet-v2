@@ -16,7 +16,7 @@ import {
   WidthType,
 } from "docx";
 
-// Dependência xlsx-style instalada para compatibilidade com ambientes legados.
+// xlsx-style dependency installed for legacy environment compatibility.
 
 /**
  * Sanitize text for PDF Standard Fonts (WinAnsi encoding).
@@ -89,7 +89,7 @@ function getTemplatePath(filename: string): string {
   }
 
   throw new Error(
-    `Template não encontrado: ${filename}. Procurado em: ${candidates.join(", ")}`
+    `Template not found: ${filename}. Searched in: ${candidates.join(", ")}`
   );
 }
 
@@ -350,8 +350,8 @@ export async function gerarPlanilhaCampanha(
   const nomeLaboratorio =
     "Laboratório de Engenharia de Reações Poliméricas - LERP / Prof. Dr. Roniérik Pioli Vieira";
 
-  // O template possui células mescladas no cabeçalho (A1:G1, A2:G2, A3:D3, E3:G3).
-  // Para garantir preenchimento consistente, escrevemos diretamente nas células do rótulo.
+  // The template has merged cells in the header (A1:G1, A2:G2, A3:D3, E3:G3).
+  // To ensure consistent filling, we write directly to the label cells.
   setCellValuePreservingStyle(
     worksheet,
     "A1",
@@ -443,22 +443,22 @@ export async function gerarPlanilhaCampanha(
 export async function gerarRotulosCampanha(residuos: any[]): Promise<Buffer> {
   const sections: any[] = [];
 
-  // Processar 2 rótulos por página
+  // Process 2 labels per page
   for (let i = 0; i < residuos.length; i += 2) {
     const children: any[] = [];
 
-    // Rótulo 1
+    // Label 1
     children.push(criarRotuloTemplate(residuos[i]));
 
-    // Espaço pequeno entre rótulos
+    // Small space between labels
     children.push(new Paragraph({ spacing: { before: 100, after: 100 } }));
 
-    // Rótulo 2 (se existir)
+    // Label 2 (if exists)
     if (residuos[i + 1]) {
       children.push(criarRotuloTemplate(residuos[i + 1]));
     }
 
-    // Quebra de página após cada par
+    // Page break after each pair
     if (i + 2 < residuos.length) {
       children.push(new Paragraph({ children: [new PageBreak()] }));
     }
@@ -513,7 +513,7 @@ function criarRotuloTemplate(residuo: any): Table {
       insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
     },
     rows: [
-      // Linha 1: Cabeçalho FEQ/UNICAMP
+      // Line 1: FEQ/UNICAMP header
       new TableRow({
         children: [
           new TableCell({
@@ -555,7 +555,7 @@ function criarRotuloTemplate(residuo: any): Table {
         ],
       }),
 
-      // Linha 3: Laboratório/Responsável
+      // Line 3: Laboratory/Responsible
       new TableRow({
         children: [
           new TableCell({
@@ -584,7 +584,7 @@ function criarRotuloTemplate(residuo: any): Table {
         ],
       }),
 
-      // Linha 4: Responsável pelas informações
+      // Line 4: Responsible for information
       new TableRow({
         children: [
           new TableCell({
@@ -625,7 +625,7 @@ function criarRotuloTemplate(residuo: any): Table {
         ],
       }),
 
-      // Linha 5: Origem do resíduo/Descrição da análise
+      // Line 5: Waste origin/Analysis description
       new TableRow({
         children: [
           new TableCell({
@@ -658,7 +658,7 @@ function criarRotuloTemplate(residuo: any): Table {
         ],
       }),
 
-      // Classe do resíduo
+      // Waste class
       new TableRow({
         children: [
           new TableCell({
@@ -790,7 +790,7 @@ function criarRotuloTemplate(residuo: any): Table {
         ],
       }),
 
-      // Checkboxes - Preenchimento Obrigatório
+      // Checkboxes - Mandatory filling
       new TableRow({
         children: [
           new TableCell({
@@ -907,7 +907,7 @@ function criarRotuloTemplate(residuo: any): Table {
         ],
       }),
 
-      // Tabela de composição
+      // Composition table
       new TableRow({
         children: [
           new TableCell({
@@ -930,7 +930,7 @@ function criarRotuloTemplate(residuo: any): Table {
         ],
       }),
 
-      // 4 linhas para composição
+      // 4 lines for composition
       ...criarLinhasComposicao(residuo),
 
       // Linha final: Aviso
