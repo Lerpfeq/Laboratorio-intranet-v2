@@ -121,166 +121,239 @@ function boolToSimNao(value: unknown): string {
   return Boolean(value) ? "SIM" : "NAO";
 }
 
+async function loadLogoBytes(): Promise<Uint8Array | null> {
+  try {
+    const logoPath = path.join(process.cwd(), "public", "logo.png");
+    return fs.readFileSync(logoPath);
+  } catch {
+    return null;
+  }
+}
+
 export async function gerarEtiquetaInterna(residuo: ResiduoDoc): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([595, 842]);
-  const { width, height } = page.getSize();
+
+  // Same dimensions as reagent label: 12cm x 5cm ~= 340 x 142 pt
+  const page = pdfDoc.addPage([340, 142]);
 
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  page.drawText("RESIDUO", {
-    x: width / 2 - 120,
-    y: height / 2 - 50,
-    size: 72,
-    font: fontBold,
-    color: rgb(1, 0.9, 0.2),
-    opacity: 0.15,
-    rotate: degrees(-45),
-  });
+  const pageWidth = page.getWidth();
+  const pageHeight = page.getHeight();
 
+  // ── Outer border ──
   page.drawRectangle({
-    x: 35,
-    y: 35,
-    width: width - 70,
-    height: height - 70,
-    borderColor: rgb(0.1, 0.1, 0.1),
+    x: 1,
+    y: 1,
+    width: pageWidth - 2,
+    height: pageHeight - 2,
     borderWidth: 1.5,
+    borderColor: rgb(0.17, 0.24, 0.32),
     color: rgb(1, 1, 1),
   });
 
-  page.drawText("RESIDUO QUIMICO", {
-    x: 50,
-    y: height - 62,
-    size: 22,
+  // ── Yellow "WASTE" watermark (diagonal, always shown) ──
+  const wmText = "WASTE";
+  const wmSize = 40;
+  const wmWidth = fontBold.widthOfTextAtSize(wmText, wmSize);
+  const wmHeight = wmSize;
+  const angleRad = (-30 * Math.PI) / 180;
+  const cx = pageWidth / 2;
+  const cy = pageHeight / 2;
+  const offX = (wmWidth * Math.cos(angleRad) - wmHeight * Math.sin(angleRad)) / 2;
+  const offY = (wmWidth * Math.sin(angleRad) + wmHeight * Math.cos(angleRad)) / 2;
+
+  page.drawText(wmText, {
+    x: cx - offX,
+    y: cy - offY + 5,
+    size: wmSize,
+    font: fontBold,
+    color: rgb(0.95, 0.75, 0),  // golden-yellow
+    rotate: degrees(-30),
+    opacity: 0.28,
+  });
+
+  // ── Header: LERP logo (square 50×50) in top-left ──
+  let logoAreaWidth = 0;
+  const logoBytes = await loadLogoBytes();
+  if (logoBytes) {
+    try {
+      const logoImage = await pdfDoc.embedPng(logoBytes);
+      const logoSize = 50;
+      page.drawImage(logoImage, {
+        x: 10,
+        y: pageHeight - 60,
+        width: logoSize,
+        height: logoSize,
+      });
+      logoAreaWidth = logoSize + 10;
+    } catch {
+      logoAreaWidth = 0;
+    }
+  }
+
+  // ── Title area (right of logo) ──
+  const tx = logoAreaWidth + 15;
+  const titleMaxW = pageWidth - tx - 10;
+
+  // Composition as main title (truncated if needed)
+  const composicao = sanitizeForPdf(residuo.composicao?.trim() || "Chemical Waste");
+  const maxTitleLen = 40;
+  const titleText = composicao.length > maxTitleLen
+    ? composicao.substring(0, maxTitleLen) + "..."
+    : composicao;
+
+  page.drawText(titleText, {
+    x: tx,
+    y: pageHeight - 20,
+    size: 12,
+    font: fontBold,
+    color: rgb(0.12, 0.18, 0.26),
+    maxWidth: titleMaxW,
+  });
+
+  // Subtitle: class + state
+  const classe = residuo.classe ?? "-";
+  const estado = residuo.estado ?? "-";
+  page.drawText(`Class: ${classe}  |  State: ${estado}`, {
+    x: tx,
+    y: pageHeight - 32,
+    size: 7,
+    font,
+    color: rgb(0.4, 0.4, 0.4),
+    maxWidth: titleMaxW,
+  });
+
+  // ── Grey box with container number (matches reagent's internal code box) ──
+  const boxY = 60;
+  page.drawRectangle({
+    x: 10,
+    y: boxY,
+    width: pageWidth - 20,
+    height: 24,
+    color: rgb(0.92, 0.92, 0.92),
+  });
+
+  page.drawText("CONTAINER #:", {
+    x: 15,
+    y: boxY + 14,
+    size: 7,
+    font,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+
+  const numeroRecipiente = String(residuo.numeroRecipiente ?? residuo.numeroOrdinal ?? "-");
+  page.drawText(numeroRecipiente, {
+    x: 15,
+    y: boxY + 4,
+    size: 11,
     font: fontBold,
     color: rgb(0, 0, 0),
   });
 
-  page.drawLine({
-    start: { x: 50, y: height - 75 },
-    end: { x: width - 50, y: height - 75 },
-    thickness: 2,
-    color: rgb(0.2, 0.2, 0.2),
+  // Volume info on the right side of the grey box
+  const volumeRecipiente = asNumber(residuo.volumeRecipienteLitros) ?? asNumber(residuo.volumeRecipiente);
+  if (volumeRecipiente !== null) {
+    const volText = `Vol: ${volumeRecipiente} L`;
+    const volWidth = font.widthOfTextAtSize(volText, 9);
+    page.drawText(volText, {
+      x: pageWidth - 15 - volWidth,
+      y: boxY + 7,
+      size: 9,
+      font,
+      color: rgb(0.2, 0.2, 0.2),
+    });
+  }
+
+  // ── Fields below the grey box ──
+  let y = boxY - 10;
+
+  // Responsible
+  page.drawText("RESPONSIBLE:", {
+    x: 15,
+    y,
+    size: 7,
+    font,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+  page.drawText(sanitizeForPdf(residuo.responsavel?.trim() || "-"), {
+    x: 80,
+    y,
+    size: 9,
+    font,
+    color: rgb(0, 0, 0),
   });
 
-  const drawField = (label: string, value: string, x: number, y: number, labelWidth = 130) => {
-    page.drawText(`${label}:`, { x, y, size: 10, font: fontBold, color: rgb(0, 0, 0) });
-    page.drawText(sanitizeForPdf(value) || "-", {
-      x: x + labelWidth,
+  // Department on the right
+  const dept = sanitizeForPdf(residuo.departamento?.trim() || "");
+  if (dept) {
+    const deptLabel = "DEPT:";
+    page.drawText(deptLabel, {
+      x: 200,
       y,
-      size: 10,
+      size: 7,
+      font,
+      color: rgb(0.3, 0.3, 0.3),
+    });
+    page.drawText(dept, {
+      x: 228,
+      y,
+      size: 9,
       font,
       color: rgb(0, 0, 0),
+      maxWidth: pageWidth - 228 - 15,
     });
-  };
+  }
 
-  const numeroRecipiente = residuo.numeroRecipiente ?? residuo.numeroOrdinal ?? "-";
-  const classe = residuo.classe ?? "-";
-  const estado = residuo.estado ?? "-";
-  const volumeAtual =
-    asNumber(residuo.volumeAtualLitros) ?? asNumber(residuo.volumeAtual) ?? asNumber(residuo.volume);
-  const volumeRecipiente = asNumber(residuo.volumeRecipienteLitros) ?? asNumber(residuo.volumeRecipiente);
+  y -= 12;
+
+  // Container type
+  if (residuo.tipoRecipiente?.trim()) {
+    page.drawText(sanitizeForPdf(`Container: ${residuo.tipoRecipiente.trim()}`), {
+      x: 15,
+      y,
+      size: 7,
+      font,
+      color: rgb(0.25, 0.25, 0.25),
+      maxWidth: pageWidth - 30,
+    });
+  }
+
+  // ── Footer line ──
+  page.drawLine({
+    start: { x: 15, y: 20 },
+    end: { x: pageWidth - 15, y: 20 },
+    thickness: 0.7,
+    color: rgb(0.88, 0.9, 0.92),
+  });
+
+  const dataStr = formatDatePtBR(residuo.data);
   const ph = asNumber(residuo.ph);
+  const footerParts = [`Date: ${dataStr}`];
+  if (ph !== null) footerParts.push(`pH: ${ph}`);
 
-  let y = height - 110;
-  const col1 = 52;
-  const col2 = 315;
-
-  drawField("N. Recipiente", String(numeroRecipiente), col1, y);
-  drawField("Data", formatDatePtBR(residuo.data), col2, y);
-  y -= 28;
-
-  drawField("Composicao", asText(residuo.composicao), col1, y, 82);
-  y -= 28;
-
-  drawField("Classe", asText(classe), col1, y);
-  drawField("Estado (S/L)", asText(estado), col2, y);
-  y -= 28;
-
-  drawField("pH", ph !== null ? String(ph) : "-", col1, y);
-  drawField("Tipo Recipiente", asText(residuo.tipoRecipiente), col2, y, 115);
-  y -= 28;
-
-  drawField("Volume (L)", volumeAtual !== null ? String(volumeAtual) : "-", col1, y);
-  drawField("Vol. Recipiente (L)", volumeRecipiente !== null ? String(volumeRecipiente) : "-", col2, y, 130);
-  y -= 28;
-
-  drawField("Responsavel", asText(residuo.responsavel), col1, y);
-  drawField("Departamento", asText(residuo.departamento), col2, y);
-  y -= 40;
-
-  page.drawRectangle({
-    x: 48,
-    y: y - 58,
-    width: width - 96,
-    height: 60,
-    borderColor: rgb(0.5, 0.5, 0.5),
-    borderWidth: 1,
-  });
-
-  page.drawText("CHECKLIST DE SEGURANCA:", { x: col1, y: y - 14, size: 11, font: fontBold });
-  page.drawText(`Enxofre: ${boolToSimNao(residuo.presencaEnxofre ?? residuo.enxofre)}`, {
-    x: col1,
-    y: y - 33,
-    size: 10,
+  page.drawText(sanitizeForPdf(footerParts.join("    ")), {
+    x: 15,
+    y: 12,
+    size: 7,
     font,
-  });
-  page.drawText(`Cianeto: ${boolToSimNao(residuo.geradorCianetos ?? residuo.cianeto)}`, {
-    x: col2,
-    y: y - 33,
-    size: 10,
-    font,
-  });
-  page.drawText(`Aminas: ${boolToSimNao(residuo.aminas)}`, {
-    x: col1,
-    y: y - 51,
-    size: 10,
-    font,
+    color: rgb(0.4, 0.4, 0.4),
+    maxWidth: pageWidth - 30,
   });
 
-  y -= 82;
-
-  page.drawRectangle({
-    x: 48,
-    y: y - 58,
-    width: width - 96,
-    height: 60,
-    borderColor: rgb(0.5, 0.5, 0.5),
-    borderWidth: 1,
-  });
-
-  const halogenados = asNumber(residuo.halogenadosPercentual ?? residuo.halogenados) ?? 0;
-  const acetonitrila = asNumber(residuo.acetonitrilaPercentual ?? residuo.acetonitrila) ?? 0;
-  const metaisPesados = asNumber(residuo.metaisPesadosPercentual ?? residuo.metaisPesados) ?? 0;
-
-  page.drawText("COMPOSICAO DETALHADA:", { x: col1, y: y - 14, size: 11, font: fontBold });
-  page.drawText(`Halogenados: ${halogenados}%`, { x: col1, y: y - 33, size: 10, font });
-  page.drawText(`Acetonitrila: ${acetonitrila}%`, { x: col2, y: y - 33, size: 10, font });
-  page.drawText(`Metais Pesados: ${metaisPesados}%`, { x: col1, y: y - 51, size: 10, font });
-
-  y -= 90;
-
-  page.drawRectangle({
-    x: 50,
-    y,
-    width: width - 100,
-    height: 40,
-    borderColor: rgb(0.8, 0.2, 0.2),
-    borderWidth: 2,
-    color: rgb(1, 0.95, 0.95),
-  });
-
-  page.drawText("ATENCAO: Utilize apenas 75% do volume do frasco", {
-    x: 67,
-    y: y + 13,
-    size: 12,
+  // LERP footer on the right
+  const lerpFooter = "LERP";
+  const lerpW = fontBold.widthOfTextAtSize(lerpFooter, 7);
+  page.drawText(lerpFooter, {
+    x: pageWidth - 15 - lerpW,
+    y: 12,
+    size: 7,
     font: fontBold,
-    color: rgb(0.7, 0.1, 0.1),
+    color: rgb(0.4, 0.4, 0.4),
   });
 
-  const pdfBytes = await pdfDoc.save();
-  return Buffer.from(pdfBytes);
+  return Buffer.from(await pdfDoc.save());
 }
 
 function cloneCellStyle(
