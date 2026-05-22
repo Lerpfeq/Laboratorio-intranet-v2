@@ -123,7 +123,10 @@ export default function RemoveBGPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to process image');
+        const msg = data.details
+          ? `${data.error}: ${data.details}`
+          : (data.error || 'Failed to process image');
+        throw new Error(msg);
       }
 
       setImages(prev =>

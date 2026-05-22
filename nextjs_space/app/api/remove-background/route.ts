@@ -1,115 +1,168 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { execSync } from 'child_process';
-import { writeFileSync, readFileSync, unlinkSync, mkdirSync, existsSync } from 'fs';
+import { writeFile, unlink, readFile } from 'fs/promises';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import path from 'path';
-import os from 'os';
+
+const execAsync = promisify(exec);
 
 export const maxDuration = 60;
 
+// Função para remover background usando rembg (GRATUITO)
+async function removeBackgroundWithRembg(inputPath: string, outputPath: string): Promise<void> {
+  try {
+    // Tentar usar rembg instalado via pip
+    await execAsync(`python3 -m rembg i "${inputPath}" "${outputPath}"`, {
+      timeout: 60000, // 60 segundos timeout
+      maxBuffer: 50 * 1024 * 1024 // 50MB buffer
+    });
+  } catch (error: any) {
+    // Se rembg não funcionar, tentar alternativa
+    throw new Error(`rembg failed: ${error.message}`);
+  }
+}
+
+// Função alternativa usando Remove.bg API (trial gratuito, depois pago)
+async function removeBackgroundWithAPI(inputBuffer: Buffer): Promise<Buffer> {
+  const REMOVE_BG_API_KEY = process.env.REMOVE_BG_API_KEY;
+
+  if (!REMOVE_BG_API_KEY) {
+    throw new Error('Remove.bg API key not configured');
+  }
+
+  const formData = new FormData();
+  formData.append('image_file', new Blob([inputBuffer]), 'image.png');
+  formData.append('size', 'auto');
+
+  const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+    method: 'POST',
+    headers: {
+      'X-Api-Key': REMOVE_BG_API_KEY,
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Remove.bg API error: ${error}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
 export async function POST(request: NextRequest) {
-  const tmpDir = path.join(os.tmpdir(), 'rembg-' + Date.now());
+  let inputPath: string | null = null;
+  let outputPath: string | null = null;
 
   try {
     const formData = await request.formData();
-    const file = formData.get('image') as File | null;
+    const image = formData.get('image') as File;
 
-    if (!file) {
+    if (!image) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 });
     }
 
-    // Validate file type
-    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/bmp'];
-    if (!validTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Invalid file type. Supported: PNG, JPEG, WebP, BMP' },
-        { status: 400 }
-      );
+    // Validar tipo de imagem
+    if (!image.type.startsWith('image/')) {
+      return NextResponse.json({ error: 'File must be an image' }, { status: 400 });
     }
 
-    // Max 10MB per image
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'File too large. Max 10MB per image.' },
-        { status: 400 }
-      );
+    // Validar tamanho (max 10MB)
+    if (image.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Image too large (max 10MB)' }, { status: 400 });
     }
 
-    // Create temp dir
-    if (!existsSync(tmpDir)) {
-      mkdirSync(tmpDir, { recursive: true });
-    }
+    const bytes = await image.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const inputPath = path.join(tmpDir, 'input.png');
-    const outputPath = path.join(tmpDir, 'output.png');
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(7);
+    inputPath = `/tmp/input_${timestamp}_${randomId}.png`;
+    outputPath = `/tmp/output_${timestamp}_${randomId}.png`;
 
-    writeFileSync(inputPath, buffer);
+    await writeFile(inputPath, buffer);
 
-    // Run rembg
+    let processedBuffer: Buffer;
+    let base64: string;
+
     try {
-      execSync(`python3 -c "
-from rembg import remove
-from PIL import Image
-import io
+      // Tentar método 1: rembg (GRATUITO, local)
+      console.log('[BG Removal] Trying rembg...');
+      await removeBackgroundWithRembg(inputPath, outputPath);
+      processedBuffer = await readFile(outputPath);
+      base64 = processedBuffer.toString('base64');
+      console.log('[BG Removal] Success with rembg');
 
-with open('${inputPath}', 'rb') as f:
-    input_data = f.read()
+    } catch (rembgError: any) {
+      console.log('[BG Removal] rembg failed:', rembgError.message);
 
-output_data = remove(input_data)
-
-with open('${outputPath}', 'wb') as f:
-    f.write(output_data)
-"`, {
-        timeout: 45000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-    } catch (execError: any) {
-      console.error('rembg error:', execError?.stderr?.toString() || execError.message);
-      return NextResponse.json(
-        { error: 'Background removal failed. Please try again.' },
-        { status: 500 }
-      );
+      // Método 2: Remove.bg API (trial gratuito, depois pago)
+      if (process.env.REMOVE_BG_API_KEY) {
+        console.log('[BG Removal] Trying Remove.bg API...');
+        processedBuffer = await removeBackgroundWithAPI(buffer);
+        base64 = processedBuffer.toString('base64');
+        console.log('[BG Removal] Success with Remove.bg API');
+      } else {
+        // Se nenhum método funcionar
+        return NextResponse.json({
+          error: 'Background removal service not available',
+          details: 'rembg is not installed and no Remove.bg API key is configured.',
+          instructions: 'Run: pip install rembg[cpu] onnxruntime'
+        }, { status: 503 });
+      }
     }
 
-    if (!existsSync(outputPath)) {
-      return NextResponse.json(
-        { error: 'Processing failed - no output generated' },
-        { status: 500 }
-      );
-    }
-
-    const outputBuffer = readFileSync(outputPath);
-    const base64 = outputBuffer.toString('base64');
-
-    // Cleanup
-    try {
-      unlinkSync(inputPath);
-      unlinkSync(outputPath);
-    } catch {}
+    // Limpar arquivos temporários
+    if (inputPath) await unlink(inputPath).catch(() => {});
+    if (outputPath) await unlink(outputPath).catch(() => {});
 
     return NextResponse.json({
       success: true,
       image: `data:image/png;base64,${base64}`,
-      originalName: file.name,
+      originalName: image.name,
     });
+
   } catch (error: any) {
-    console.error('Remove background error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
-  } finally {
-    // Cleanup temp dir
-    try {
-      if (existsSync(tmpDir)) {
-        const files = require('fs').readdirSync(tmpDir);
-        for (const f of files) {
-          unlinkSync(path.join(tmpDir, f));
-        }
-        require('fs').rmdirSync(tmpDir);
-      }
-    } catch {}
+    // Limpar arquivos em caso de erro
+    if (inputPath) await unlink(inputPath).catch(() => {});
+    if (outputPath) await unlink(outputPath).catch(() => {});
+
+    console.error('[BG Removal] Error:', error);
+
+    return NextResponse.json({
+      error: 'Failed to process image',
+      details: error.message,
+      suggestion: 'Try with a smaller image or contact support'
+    }, { status: 500 });
   }
 }
 
+// Health check
+export async function GET() {
+  try {
+    // Verificar se rembg está disponível
+    const { stdout } = await execAsync('python3 -c "import rembg; print(rembg.__version__)"', {
+      timeout: 5000
+    });
 
+    return NextResponse.json({
+      status: 'ready',
+      method: 'rembg',
+      version: stdout.trim(),
+      cost: 'FREE'
+    });
+  } catch {
+    // Se rembg não está disponível
+    const hasAPIKey = !!process.env.REMOVE_BG_API_KEY;
+
+    return NextResponse.json({
+      status: hasAPIKey ? 'api-fallback' : 'unavailable',
+      method: hasAPIKey ? 'Remove.bg API' : 'none',
+      rembgInstalled: false,
+      apiKeyConfigured: hasAPIKey,
+      cost: hasAPIKey ? 'PAID (after trial)' : 'N/A',
+      installation: 'pip install rembg[cpu] onnxruntime'
+    }, { status: hasAPIKey ? 200 : 503 });
+  }
+}
