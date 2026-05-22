@@ -10,13 +10,12 @@ import {
   dateFnsLocalizer,
   Views,
 } from 'react-big-calendar';
-import type { CalendarProps } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
-// Cast to avoid refs type mismatch between @types/react-big-calendar and @types/react@18
-const Calendar = RBCalendar as React.ComponentType<CalendarProps>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Calendar = RBCalendar as unknown as React.ComponentType<any>;
 
 const locales = { 'pt-BR': ptBR };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
@@ -382,9 +381,9 @@ export default function AgendamentosPage() {
             endAccessor="end"
             style={{ height: 650 }}
             view={calendarView}
-            onView={(v) => setCalendarView(v)}
+            onView={(v: any) => setCalendarView(v)}
             date={calendarDate}
-            onNavigate={(d) => setCalendarDate(d)}
+            onNavigate={(d: any) => setCalendarDate(d)}
             selectable
             onSelectSlot={handleSelectSlot}
             onSelectEvent={handleSelectEvent}
