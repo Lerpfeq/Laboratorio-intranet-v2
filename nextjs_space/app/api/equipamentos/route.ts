@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// GET - List equipments (filtrado por permissão)
+// GET - List equipments (filtered by permission)
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

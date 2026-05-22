@@ -4,11 +4,11 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 // Cron Job - Run daily at 00:05
-// Deleta bookings que já passaram
+// Deletes past bookings
 // Can be called via external cron (e.g. cron-job.org) or Render Cron
 export async function GET(request: NextRequest) {
   try {
-    // Verificar token de segurança (para chamadas externas)
+    // Verify security token (for external calls)
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
     const cronSecret = process.env.CRON_SECRET || 'lerp-cron-2026';
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const now = new Date();
 
-    // Deletar bookings onde o fim já passou
+    // Delete bookings where end time has passed
     const result = await prisma.agendamento.deleteMany({
       where: {
         fim: { lt: now },

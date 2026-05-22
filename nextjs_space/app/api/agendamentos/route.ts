@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
         sopLink: equipamento.sopLink,
         inicio: formatDate(inicioDate),
         fim: formatDate(fimDate),
-        criadoPor: user.name || 'Sem nome',
+        criadoPor: user.name || 'No name',
         criadoPorEmail: user.email || '',
         paraQuem: paraQuemNome,
         paraQuemEmail,
