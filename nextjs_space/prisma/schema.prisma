@@ -23,6 +23,11 @@ enum EstadoResiduo {
   L
 }
 
+enum TipoAutorizacao {
+  RESPONSAVEL
+  TREINADO
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -62,14 +67,17 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts     Account[]
-  sessions     Session[]
-  reagentes    ReagenteEntrada[]
-  saidas       ReagenteSaida[]
-  pedidos      Pedido[]
-  agendamentos Agendamento[]
-  autorizacoes AutorizacaoEquipamento[]
-  residuos     RegistroResiduo[]
+  accounts  Account[]
+  sessions  Session[]
+  reagentes ReagenteEntrada[]
+  saidas    ReagenteSaida[]
+  pedidos   Pedido[]
+  residuos  RegistroResiduo[]
+
+  // Equipamento relations
+  autorizacoesEquipamento AutorizacaoEquipamento[]
+  agendamentosCriados     Agendamento[]            @relation("AgendamentoCriador")
+  agendamentosPara        Agendamento[]            @relation("AgendamentoPara")
 
   @@index([status])
   @@index([category])
@@ -87,29 +95,59 @@ model Equipamento {
   id        String   @id @default(cuid())
   nome      String
   descricao String?
-  status    String   @default("disponivel")
+  sopLink   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   autorizacoes AutorizacaoEquipamento[]
   agendamentos Agendamento[]
 
-  @@index([status])
+  @@map("equipamentos")
 }
 
 model AutorizacaoEquipamento {
-  id            String   @id @default(cuid())
-  usuarioId     String
+  id            String          @id @default(cuid())
+  userId        String
   equipamentoId String
-  autorizado    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  tipo          TipoAutorizacao
+  createdAt     DateTime        @default(now())
 
-  usuario     User        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   equipamento Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
 
-  @@unique([usuarioId, equipamentoId])
+  @@unique([userId, equipamentoId, tipo])
+  @@map("autorizacoes_equipamento")
+}
+
+model Agendamento {
+  id            String @id @default(cuid())
+  equipamentoId String
+  userId        String
+
+  // Para quem e o agendamento
+  paraUsuarioInternoId String?
+  paraUsuarioExterno   String?
+  emailExterno         String?
+  emailOrientador      String?
+
+  // Data e hora
+  inicio DateTime
+  fim    DateTime
+
+  // Extras
+  observacoes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  equipamento        Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
+  usuario            User        @relation("AgendamentoCriador", fields: [userId], references: [id], onDelete: Cascade)
+  paraUsuarioInterno User?       @relation("AgendamentoPara", fields: [paraUsuarioInternoId], references: [id], onDelete: SetNull)
+
   @@index([equipamentoId])
+  @@index([inicio])
+  @@index([userId])
+  @@map("agendamentos")
 }
 
 model Reagente {
@@ -197,24 +235,6 @@ model Pedido {
   @@index([reagenteId])
   @@index([status])
   @@index([dataPedido])
-}
-
-model Agendamento {
-  id            String   @id @default(cuid())
-  equipamentoId String
-  usuarioId     String?
-  dataInicio    DateTime
-  dataFim       DateTime
-  observacoes   String?  @db.Text
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  equipamento Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
-  usuario     User?       @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
-
-  @@index([equipamentoId])
-  @@index([dataInicio])
-  @@index([usuarioId])
 }
 
 model RegistroResiduo {

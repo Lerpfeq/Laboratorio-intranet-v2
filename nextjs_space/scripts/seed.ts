@@ -30,7 +30,6 @@ async function main() {
         id: "injetora-1",
         nome: "Injetora Haake",
         descricao: "Injetora para testes de polimeros",
-        status: "disponivel",
       },
     });
 

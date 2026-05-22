@@ -75,7 +75,7 @@ export default function DashboardPage() {
               <>
                 <Link href="/dashboard">Dashboard</Link>
                 <Link href="/reagentes">Reagent</Link>
-                {(isPosGraduando || isAdmin) && <Link href="/agendamento">Calendar</Link>}
+                {(isPosGraduando || isAdmin) && <Link href="/agendamentos">Calendar</Link>}
                 {(isPosGraduando || isAdmin) && <Link href="/residuos">Waste</Link>}
                 <Link href="/amostras">Samples Seletion</Link>
                 <Link href="/removedor-bg">Image</Link>
@@ -138,7 +138,7 @@ export default function DashboardPage() {
               )}
 
               {(isPosGraduando || isAdmin) && (
-                <Link href="/agendamento" style={{ textDecoration: 'none' }}>
+                <Link href="/agendamentos" style={{ textDecoration: 'none' }}>
                   <div className="card card-orange">
                     <div className="card-header">
                       <span>Calendar</span>
@@ -178,10 +178,21 @@ export default function DashboardPage() {
               </Link>
 
               {isAdmin && (
-                <Link href="/admin" style={{ textDecoration: 'none' }}>
+                <Link href="/agendamentos/settings" style={{ textDecoration: 'none' }}>
                   <div className="card card-teal">
                     <div className="card-header">
-                      <span>Settings</span>
+                      <span>Equipment Settings</span>
+                    </div>
+                    <p style={{ color: '#666', fontSize: '0.9rem' }}>Manage equipment and authorizations</p>
+                  </div>
+                </Link>
+              )}
+
+              {isAdmin && (
+                <Link href="/admin" style={{ textDecoration: 'none' }}>
+                  <div className="card" style={{ borderLeft: '4px solid #7f8c8d' }}>
+                    <div className="card-header">
+                      <span>Admin</span>
                     </div>
                     <p style={{ color: '#666', fontSize: '0.9rem' }}>Manage users and permissions</p>
                   </div>
