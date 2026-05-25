@@ -134,6 +134,7 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
   const [loading, setLoading] = useState(false);
 
   const [filtroNome, setFiltroNome] = useState('');
+  const [filtroCodigo, setFiltroCodigo] = useState('');
   const [filtroMarca, setFiltroMarca] = useState('');
   const [filtroLocalizacao, setFiltroLocalizacao] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'all' | 'valid' | 'expired'>('all');
@@ -164,6 +165,7 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
       const status = getStatus(entrada?.dataValidade || null);
 
       const matchNome = !filtroNome || r.nome.toLowerCase().includes(filtroNome.toLowerCase());
+      const matchCodigo = !filtroCodigo || (entrada?.codigoInterno || '').toLowerCase().includes(filtroCodigo.toLowerCase());
       const matchMarca = !filtroMarca || (r.marca || '').toLowerCase().includes(filtroMarca.toLowerCase());
       const matchLocalizacao = !filtroLocalizacao || location.toLowerCase().includes(filtroLocalizacao.toLowerCase());
       const matchStatus =
@@ -171,9 +173,9 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
         (filtroStatus === 'valid' && status === 'Valid') ||
         (filtroStatus === 'expired' && status === 'Expired');
 
-      return matchNome && matchMarca && matchLocalizacao && matchStatus;
+      return matchNome && matchCodigo && matchMarca && matchLocalizacao && matchStatus;
     });
-  }, [reagentes, filtroNome, filtroMarca, filtroLocalizacao, filtroStatus]);
+  }, [reagentes, filtroNome, filtroCodigo, filtroMarca, filtroLocalizacao, filtroStatus]);
 
   return (
     <div>
@@ -185,6 +187,14 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
           placeholder="Filter by name..."
           value={filtroNome}
           onChange={(e) => setFiltroNome(e.target.value)}
+          className="filter-input"
+        />
+
+        <input
+          type="text"
+          placeholder="Filter by internal code... (e.g. LERP-S1234)"
+          value={filtroCodigo}
+          onChange={(e) => setFiltroCodigo(e.target.value)}
           className="filter-input"
         />
 
