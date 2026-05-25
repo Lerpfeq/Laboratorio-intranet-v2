@@ -41,6 +41,7 @@ export default function AdminSettingsPage() {
   const [editingLoc, setEditingLoc] = useState<Location | null>(null);
 
   const [message, setMessage] = useState('');
+  const [seeding, setSeeding] = useState(false);
 
   // Auth guard
   useEffect(() => {
@@ -115,6 +116,28 @@ export default function AdminSettingsPage() {
     if (res.ok) { fetchLocations(); setMessage('Location deleted ✓'); }
   };
 
+  /* ── Seed Database ── */
+  const handleSeed = async () => {
+    if (!confirm('⚠️ This will DELETE all existing categories and locations and recreate the default 18 categories + 10 locations.\n\nContinue?')) return;
+    setSeeding(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/admin/seed', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setMessage(`✅ ${data.message}`);
+        fetchCategories();
+        fetchLocations();
+      } else {
+        setMessage(`❌ Error: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setMessage(`❌ Error: ${err.message}`);
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   if (status === 'loading' || loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
@@ -160,6 +183,39 @@ export default function AdminSettingsPage() {
             }}
           >
             {message}
+          </div>
+        )}
+
+        {/* ────── SEED BUTTON ────── */}
+        {categories.length === 0 && locations.length === 0 && (
+          <div
+            style={{
+              padding: '16px 20px',
+              marginBottom: '2rem',
+              borderRadius: '8px',
+              background: '#e3f2fd',
+              border: '1px solid #90caf9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <strong style={{ color: '#1565c0' }}>🌱 Initialize Database</strong>
+              <p style={{ margin: '4px 0 0', color: '#1976d2', fontSize: '14px' }}>
+                No data found. Click to load the default 18 categories and 10 storage locations.
+              </p>
+            </div>
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="button button-primary"
+              style={{ whiteSpace: 'nowrap', opacity: seeding ? 0.6 : 1 }}
+            >
+              {seeding ? '⏳ Seeding...' : '🌱 Seed Database'}
+            </button>
           </div>
         )}
 
