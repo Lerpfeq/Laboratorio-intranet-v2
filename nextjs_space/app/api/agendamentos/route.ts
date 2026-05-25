@@ -180,7 +180,9 @@ export async function POST(request: NextRequest) {
       paraQuemEmail = emailExterno || '';
     }
 
-    // Send emails — await to ensure delivery completes on serverless environments
+    // ── EMAIL: Fire-and-forget ──
+    // Booking is already saved in DB above — email is just a notification.
+    // NEVER await here: if SMTP is slow/down the user would stare at "Saving..." forever.
     const responsavelEmails = equipamento.autorizacoes
       .map((a) => a.user.email)
       .filter(Boolean) as string[];
@@ -188,37 +190,31 @@ export async function POST(request: NextRequest) {
     const formatDate = (d: Date) =>
       d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
-    console.log('[Agendamento] Sending emails...');
+    const emailPayload = {
+      equipamentoNome: equipamento.nome,
+      sopLink: equipamento.sopLink,
+      inicio: formatDate(inicioDate),
+      fim: formatDate(fimDate),
+      criadoPor: user.name || 'No name',
+      criadoPorEmail: user.email || '',
+      paraQuem: paraQuemNome,
+      paraQuemEmail,
+      emailOrientador: emailOrientador?.trim() || null,
+      observacoes: observacoes?.trim() || null,
+      inicioRaw: inicioDate.toISOString(),
+      fimRaw: fimDate.toISOString(),
+    };
+
+    console.log('[Agendamento] 📧 Queuing email (fire-and-forget)...');
     console.log('[Agendamento] paraQuem:', paraQuem, '| isExterno:', isExterno);
-    console.log('[Agendamento] paraQuemNome:', paraQuemNome, '| paraQuemEmail:', paraQuemEmail);
-    console.log('[Agendamento] emailOrientador:', emailOrientador?.trim() || 'N/A');
-    console.log('[Agendamento] responsavelEmails:', responsavelEmails);
+    console.log('[Agendamento] paraQuemEmail:', paraQuemEmail);
 
-    try {
-      await sendAgendamentoEmails(
-        {
-          equipamentoNome: equipamento.nome,
-          sopLink: equipamento.sopLink,
-          inicio: formatDate(inicioDate),
-          fim: formatDate(fimDate),
-          criadoPor: user.name || 'No name',
-          criadoPorEmail: user.email || '',
-          paraQuem: paraQuemNome,
-          paraQuemEmail,
-          emailOrientador: emailOrientador?.trim() || null,
-          observacoes: observacoes?.trim() || null,
-          inicioRaw: inicioDate.toISOString(),
-          fimRaw: fimDate.toISOString(),
-        },
-        responsavelEmails,
-        isExterno
-      );
-      console.log('[Agendamento] ✅ Email sending completed');
-    } catch (emailErr) {
-      console.error('[Agendamento] ❌ Email sending failed:', emailErr);
-      // Don't fail the booking if email fails
-    }
+    // Fire-and-forget: NO await — response returns immediately
+    sendAgendamentoEmails(emailPayload, responsavelEmails, isExterno)
+      .then(() => console.log('[Agendamento] ✅ Email delivery completed in background'))
+      .catch((err) => console.error('[Agendamento] ❌ Email delivery failed in background:', err));
 
+    // Return response IMMEDIATELY — user sees success right away
     return NextResponse.json(booking, { status: 201 });
   } catch (error: any) {
     console.error('Agendamentos POST error:', error);

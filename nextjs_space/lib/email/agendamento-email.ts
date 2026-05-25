@@ -34,6 +34,9 @@ function createTransporter() {
   return nodemailer.createTransport({
     service: 'gmail',
     auth: { user, pass },
+    connectionTimeout: 10000,  // 10s to establish connection
+    greetingTimeout: 10000,    // 10s for SMTP greeting
+    socketTimeout: 10000,      // 10s for socket inactivity
   });
 }
 
@@ -154,6 +157,16 @@ function formatEmailHtml(data: BookingEmailData, googleCalLink: string | null): 
 </html>`;
 }
 
+/* ─────────── Timeout helper ─────────── */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`[Email] ⏱️ ${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 /* ─────────── Main Send Function ─────────── */
 export async function sendAgendamentoEmails(
   data: BookingEmailData,
@@ -209,26 +222,33 @@ export async function sendAgendamentoEmails(
   const subject = `📅 LERP — Scheduling Confirmed: ${data.equipamentoNome} — ${data.inicio}`;
   const from = `"LERP — FEQ/UNICAMP" <${process.env.EMAIL_USER || 'lerpfeq@gmail.com'}>`;
 
-  // Send all emails in parallel — AWAIT to ensure delivery completes before response
   const recipientList = Array.from(recipients);
   console.log(`[Email] Total recipients (${recipientList.length}):`, recipientList);
-  console.log(`[Email] isExterno=${isExterno}, paraQuemEmail="${data.paraQuemEmail}", emailOrientador="${data.emailOrientador}"`);
 
+  // Send each email with a per-recipient 10s timeout
   const sendPromises = recipientList.map(async (email) => {
     try {
       console.log(`[Email] Sending to: ${email}`);
-      const info = await transporter.sendMail({ from, to: email, subject, html });
+      const info = await withTimeout(
+        transporter.sendMail({ from, to: email, subject, html }),
+        10000,
+        `sendMail(${email})`
+      );
       console.log(`[Email] ✅ Sent to ${email} — messageId: ${info.messageId}`);
-    } catch (err) {
-      console.error(`[Email] ❌ Failed to send to ${email}:`, err);
+    } catch (err: any) {
+      console.error(`[Email] ❌ Failed to send to ${email}:`, err?.message || err);
       // Don't throw — emails are best-effort
     }
   });
 
+  // Global 15s timeout for the entire batch
   try {
-    await Promise.all(sendPromises);
+    await withTimeout(Promise.all(sendPromises), 15000, 'all emails batch');
     console.log(`[Email] ✅ All ${recipientList.length} emails processed`);
-  } catch (err) {
-    console.error('[Email] Batch send error:', err);
+  } catch (err: any) {
+    console.error('[Email] ⏱️ Batch timed out or failed:', err?.message || err);
+  } finally {
+    // Close transporter to release socket — prevents hanging connections
+    transporter.close();
   }
 }
