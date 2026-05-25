@@ -158,6 +158,19 @@ export default function AdminPage() {
       <main className="container">
         <h2 className="page-title">Admin Panel</h2>
 
+        <div style={{ marginBottom: '1.5rem' }}>
+          <Link
+            href="/admin/settings"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '10px 20px', background: '#3498db', color: 'white',
+              borderRadius: '6px', textDecoration: 'none', fontWeight: 500,
+            }}
+          >
+            ⚙️ Categories &amp; Storage Settings
+          </Link>
+        </div>
+
         <h3 style={{ marginBottom: '1rem', marginTop: '2rem' }}>Manage Users</h3>
         <table className="table">
           <thead>

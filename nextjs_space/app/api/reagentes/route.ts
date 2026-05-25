@@ -6,26 +6,23 @@ import { gerarEtiquetaReagente } from "@/lib/reagentes-label";
 
 export const dynamic = "force-dynamic";
 
-const CATEGORY_LETTER: Record<string, string> = {
-  Solvent: "S",
-  Acid: "A",
-  Base: "B",
-  Monomer: "M",
-  Polymer: "P",
-  Crosslinker: "X",
-  Catalyst: "C",
-  Photoinitiator: "F",
-  "Oxidizer / Reducer": "O",
-  Nanomaterial: "N",
-  Analytical: "L",
-  "Controlled Substance": "K",
-  Microbiology: "G",
-  "Inorganic Salt": "I",
-  Thiol: "T",
-};
+// Category letter mapping is now loaded from DB (ReagentCategory table)
+// Fallback to "U" if category not found
+async function getCategoryLetter(categoria: string): Promise<string> {
+  if (!categoria) return "U";
+  try {
+    const cat = await prisma.reagentCategory.findFirst({
+      where: { name: { equals: categoria, mode: "insensitive" } },
+      select: { letter: true },
+    });
+    return cat?.letter || "U";
+  } catch {
+    return "U";
+  }
+}
 
-function generateCodigoInterno(categoria: string): string {
-  const letter = CATEGORY_LETTER[categoria] ?? "U";
+async function generateCodigoInterno(categoria: string): Promise<string> {
+  const letter = await getCategoryLetter(categoria);
   const digits = Math.floor(1000 + Math.random() * 9000).toString();
   return `LERP-${letter}${digits}`;
 }
@@ -132,7 +129,7 @@ export async function POST(request: NextRequest) {
         let exists = true;
 
         do {
-          codigoInterno = generateCodigoInterno(categoria);
+          codigoInterno = await generateCodigoInterno(categoria);
           const found = await tx.reagenteEntrada.findFirst({ where: { codigoInterno } });
           exists = !!found;
         } while (exists);

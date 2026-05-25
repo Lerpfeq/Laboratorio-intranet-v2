@@ -267,3 +267,28 @@ model RegistroResiduo {
   @@index([classe])
   @@index([departamento])
 }
+
+model ReagentCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  letter      String   @default("U")
+  description String?
+  storageMap  String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("reagent_categories")
+}
+
+model StorageLocation {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  type        String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("storage_locations")
+}
