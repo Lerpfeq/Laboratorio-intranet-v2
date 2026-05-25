@@ -209,8 +209,12 @@ export async function sendAgendamentoEmails(
   const subject = `📅 LERP — Scheduling Confirmed: ${data.equipamentoNome} — ${data.inicio}`;
   const from = `"LERP — FEQ/UNICAMP" <${process.env.EMAIL_USER || 'lerpfeq@gmail.com'}>`;
 
-  // Fire-and-forget: send all emails in parallel
-  const sendPromises = Array.from(recipients).map(async (email) => {
+  // Send all emails in parallel — AWAIT to ensure delivery completes before response
+  const recipientList = Array.from(recipients);
+  console.log(`[Email] Total recipients (${recipientList.length}):`, recipientList);
+  console.log(`[Email] isExterno=${isExterno}, paraQuemEmail="${data.paraQuemEmail}", emailOrientador="${data.emailOrientador}"`);
+
+  const sendPromises = recipientList.map(async (email) => {
     try {
       console.log(`[Email] Sending to: ${email}`);
       const info = await transporter.sendMail({ from, to: email, subject, html });
@@ -221,7 +225,10 @@ export async function sendAgendamentoEmails(
     }
   });
 
-  Promise.all(sendPromises).catch((err) => {
+  try {
+    await Promise.all(sendPromises);
+    console.log(`[Email] ✅ All ${recipientList.length} emails processed`);
+  } catch (err) {
     console.error('[Email] Batch send error:', err);
-  });
+  }
 }

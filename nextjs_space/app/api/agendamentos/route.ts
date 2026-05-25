@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
       paraQuemEmail = emailExterno || '';
     }
 
-    // Send emails (async - non-blocking)
+    // Send emails — await to ensure delivery completes on serverless environments
     const responsavelEmails = equipamento.autorizacoes
       .map((a) => a.user.email)
       .filter(Boolean) as string[];
@@ -188,24 +188,36 @@ export async function POST(request: NextRequest) {
     const formatDate = (d: Date) =>
       d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
-    sendAgendamentoEmails(
-      {
-        equipamentoNome: equipamento.nome,
-        sopLink: equipamento.sopLink,
-        inicio: formatDate(inicioDate),
-        fim: formatDate(fimDate),
-        criadoPor: user.name || 'No name',
-        criadoPorEmail: user.email || '',
-        paraQuem: paraQuemNome,
-        paraQuemEmail,
-        emailOrientador: emailOrientador?.trim() || null,
-        observacoes: observacoes?.trim() || null,
-        inicioRaw: inicioDate.toISOString(),
-        fimRaw: fimDate.toISOString(),
-      },
-      responsavelEmails,
-      isExterno
-    );
+    console.log('[Agendamento] Sending emails...');
+    console.log('[Agendamento] paraQuem:', paraQuem, '| isExterno:', isExterno);
+    console.log('[Agendamento] paraQuemNome:', paraQuemNome, '| paraQuemEmail:', paraQuemEmail);
+    console.log('[Agendamento] emailOrientador:', emailOrientador?.trim() || 'N/A');
+    console.log('[Agendamento] responsavelEmails:', responsavelEmails);
+
+    try {
+      await sendAgendamentoEmails(
+        {
+          equipamentoNome: equipamento.nome,
+          sopLink: equipamento.sopLink,
+          inicio: formatDate(inicioDate),
+          fim: formatDate(fimDate),
+          criadoPor: user.name || 'No name',
+          criadoPorEmail: user.email || '',
+          paraQuem: paraQuemNome,
+          paraQuemEmail,
+          emailOrientador: emailOrientador?.trim() || null,
+          observacoes: observacoes?.trim() || null,
+          inicioRaw: inicioDate.toISOString(),
+          fimRaw: fimDate.toISOString(),
+        },
+        responsavelEmails,
+        isExterno
+      );
+      console.log('[Agendamento] ✅ Email sending completed');
+    } catch (emailErr) {
+      console.error('[Agendamento] ❌ Email sending failed:', emailErr);
+      // Don't fail the booking if email fails
+    }
 
     return NextResponse.json(booking, { status: 201 });
   } catch (error: any) {
