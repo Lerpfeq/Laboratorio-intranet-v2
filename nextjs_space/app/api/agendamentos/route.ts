@@ -200,6 +200,8 @@ export async function POST(request: NextRequest) {
         paraQuemEmail,
         emailOrientador: emailOrientador?.trim() || null,
         observacoes: observacoes?.trim() || null,
+        inicioRaw: inicioDate.toISOString(),
+        fimRaw: fimDate.toISOString(),
       },
       responsavelEmails,
       isExterno

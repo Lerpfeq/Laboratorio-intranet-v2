@@ -1,10 +1,14 @@
 // Email notification utility for equipment bookings
-// Sends emails asynchronously - failures do NOT cancel the booking
+// Uses Gmail SMTP via nodemailer — includes Google Calendar link
+// Failures do NOT cancel the booking (fire-and-forget)
 
+import nodemailer from 'nodemailer';
+
+/* ─────────── Types ─────────── */
 interface BookingEmailData {
   equipamentoNome: string;
   sopLink?: string | null;
-  inicio: string;
+  inicio: string;          // Already formatted "dd/mm/yyyy HH:mm"
   fim: string;
   criadoPor: string;
   criadoPorEmail: string;
@@ -12,120 +16,211 @@ interface BookingEmailData {
   paraQuemEmail?: string;
   emailOrientador?: string | null;
   observacoes?: string | null;
+  // Raw dates for Google Calendar link
+  inicioRaw?: string;      // ISO string
+  fimRaw?: string;
 }
 
-function formatEmailHtml(data: BookingEmailData): string {
+/* ─────────── Gmail Transporter ─────────── */
+function createTransporter() {
+  const user = process.env.EMAIL_USER || 'lerpfeq@gmail.com';
+  const pass = process.env.EMAIL_PASS || '';
+
+  if (!pass) {
+    console.warn('[Email] EMAIL_PASS not configured — emails will be skipped');
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+  });
+}
+
+/* ─────────── Google Calendar Link ─────────── */
+function generateGoogleCalendarLink(
+  title: string,
+  description: string,
+  startISO: string,
+  endISO: string,
+  location: string = ''
+): string {
+  const fmt = (iso: string) =>
+    new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    details: description,
+    dates: `${fmt(startISO)}/${fmt(endISO)}`,
+    location,
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/* ─────────── HTML Template ─────────── */
+function formatEmailHtml(data: BookingEmailData, googleCalLink: string | null): string {
   const sopSection = data.sopLink
-    ? `<p><strong>SOP:</strong> <a href="${data.sopLink}" target="_blank">${data.sopLink}</a></p>`
+    ? `<tr style="border-bottom:1px solid #eee;">
+         <td style="padding:12px;font-weight:bold;color:#555;width:35%;">📋 SOP</td>
+         <td style="padding:12px;"><a href="${data.sopLink}" style="color:#4285f4;" target="_blank">View SOP</a></td>
+       </tr>`
+    : '';
+
+  const notesSection = data.observacoes
+    ? `<tr style="border-bottom:1px solid #eee;">
+         <td style="padding:12px;font-weight:bold;color:#555;">📝 Notes</td>
+         <td style="padding:12px;color:#333;">${data.observacoes}</td>
+       </tr>`
+    : '';
+
+  const calendarButton = googleCalLink
+    ? `<div style="text-align:center;margin:25px 0;">
+         <a href="${googleCalLink}" target="_blank"
+            style="display:inline-block;background:#4285f4;color:white;padding:14px 28px;
+                   text-decoration:none;border-radius:6px;font-weight:bold;font-size:15px;">
+           📅 Add to Google Calendar
+         </a>
+       </div>`
     : '';
 
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #0c2340, #1b3a5c); padding: 20px; border-radius: 8px 8px 0 0;">
-        <h2 style="color: white; margin: 0;">LERP - Equipment Booking</h2>
-      </div>
-      <div style="background: white; padding: 20px; border: 1px solid #e0e0e0; border-radius: 0 0 8px 8px;">
-        <p style="font-size: 16px; color: #333;">A new booking has been created:</p>
-        
-        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 10px; font-weight: bold; color: #555; width: 40%;">Equipment</td>
-            <td style="padding: 10px; color: #333;">${data.equipamentoNome}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 10px; font-weight: bold; color: #555;">Start</td>
-            <td style="padding: 10px; color: #333;">${data.inicio}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 10px; font-weight: bold; color: #555;">End</td>
-            <td style="padding: 10px; color: #333;">${data.fim}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 10px; font-weight: bold; color: #555;">Booked by</td>
-            <td style="padding: 10px; color: #333;">${data.criadoPor} (${data.criadoPorEmail})</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 10px; font-weight: bold; color: #555;">For</td>
-            <td style="padding: 10px; color: #333;">${data.paraQuem}${data.paraQuemEmail ? ` (${data.paraQuemEmail})` : ''}</td>
-          </tr>
-          ${data.observacoes ? `
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 10px; font-weight: bold; color: #555;">Notes</td>
-            <td style="padding: 10px; color: #333;">${data.observacoes}</td>
-          </tr>
-          ` : ''}
-        </table>
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f4f4f4;">
+  <div style="max-width:600px;margin:20px auto;background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
 
-        ${sopSection}
-
-        <p style="font-size: 12px; color: #999; margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px;">
-          This email was sent automatically by the LERP Intranet system.
-        </p>
-      </div>
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;text-align:center;">
+      <h1 style="color:white;margin:0;font-size:22px;">📅 Scheduling Confirmed</h1>
+      <p style="color:rgba(255,255,255,0.85);margin:8px 0 0 0;font-size:14px;">
+        LERP — Laboratory of Engineering of Polymeric Reactions
+      </p>
     </div>
-  `;
+
+    <!-- Body -->
+    <div style="padding:25px 30px;">
+      <p style="font-size:16px;color:#333;">Hello <strong>${data.paraQuem}</strong>,</p>
+      <p style="color:#555;">Your equipment scheduling has been confirmed. Details below:</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:12px;font-weight:bold;color:#555;width:35%;">🔬 Equipment</td>
+          <td style="padding:12px;color:#333;font-weight:bold;">${data.equipamentoNome}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:12px;font-weight:bold;color:#555;">🕐 Start</td>
+          <td style="padding:12px;color:#333;">${data.inicio}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:12px;font-weight:bold;color:#555;">🕑 End</td>
+          <td style="padding:12px;color:#333;">${data.fim}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:12px;font-weight:bold;color:#555;">👤 Booked by</td>
+          <td style="padding:12px;color:#333;">${data.criadoPor} (${data.criadoPorEmail})</td>
+        </tr>
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:12px;font-weight:bold;color:#555;">👥 For</td>
+          <td style="padding:12px;color:#333;">${data.paraQuem}${data.paraQuemEmail ? ` (${data.paraQuemEmail})` : ''}</td>
+        </tr>
+        ${notesSection}
+        ${sopSection}
+      </table>
+
+      ${calendarButton}
+
+      <p style="color:#888;font-size:13px;margin-top:20px;">
+        <strong>Important:</strong> Please arrive 5 minutes before your scheduled time.
+        If you need to cancel or reschedule, please do so through the intranet.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f9f9f9;padding:20px;text-align:center;border-top:1px solid #eee;">
+      <p style="margin:0;color:#666;font-size:14px;font-weight:bold;">LERP — FEQ/UNICAMP</p>
+      <p style="margin:4px 0 0 0;color:#999;font-size:12px;">
+        Laboratório de Engenharia de Reações Poliméricas — Prof. Dr. Roniérik Pioli Vieira
+      </p>
+      <p style="margin:8px 0 0 0;color:#bbb;font-size:11px;">
+        This is an automated message. Please do not reply to this email.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>`;
 }
 
+/* ─────────── Main Send Function ─────────── */
 export async function sendAgendamentoEmails(
   data: BookingEmailData,
   responsavelEmails: string[],
   isExterno: boolean
 ): Promise<void> {
+  const transporter = createTransporter();
+
+  if (!transporter) {
+    console.log('[Email] Transporter not available — skipping all emails');
+    return;
+  }
+
   // Collect all recipients
   const recipients = new Set<string>();
 
   // Creator always receives
   if (data.criadoPorEmail) recipients.add(data.criadoPorEmail);
 
-  // Equipment managers
+  // Target user
+  if (data.paraQuemEmail) recipients.add(data.paraQuemEmail);
+
+  // Equipment managers / responsáveis
   for (const email of responsavelEmails) {
     if (email) recipients.add(email);
   }
 
-  // If external: external user + advisor
-  if (isExterno) {
-    if (data.paraQuemEmail) recipients.add(data.paraQuemEmail);
-    if (data.emailOrientador) recipients.add(data.emailOrientador);
+  // External: also send to advisor
+  if (isExterno && data.emailOrientador) {
+    recipients.add(data.emailOrientador);
   }
 
-  const html = formatEmailHtml(data);
-  const subject = `LERP - Booking: ${data.equipamentoNome} - ${data.inicio}`;
+  // Generate Google Calendar link if raw dates available
+  let googleCalLink: string | null = null;
+  if (data.inicioRaw && data.fimRaw) {
+    const description = [
+      `Equipment: ${data.equipamentoNome}`,
+      `Booked by: ${data.criadoPor}`,
+      `For: ${data.paraQuem}`,
+      data.observacoes ? `Notes: ${data.observacoes}` : '',
+    ].filter(Boolean).join('\n');
 
-  // Send emails asynchronously - fire and forget
+    googleCalLink = generateGoogleCalendarLink(
+      `LERP — ${data.equipamentoNome}`,
+      description,
+      data.inicioRaw,
+      data.fimRaw,
+      'LERP — FEQ/UNICAMP'
+    );
+  }
+
+  const html = formatEmailHtml(data, googleCalLink);
+  const subject = `📅 LERP — Scheduling Confirmed: ${data.equipamentoNome} — ${data.inicio}`;
+  const from = `"LERP — FEQ/UNICAMP" <${process.env.EMAIL_USER || 'lerpfeq@gmail.com'}>`;
+
+  // Fire-and-forget: send all emails in parallel
   const sendPromises = Array.from(recipients).map(async (email) => {
     try {
-      console.log(`[Email] Sending to: ${email} | Subject: ${subject}`);
-
-      // If SMTP is configured, use nodemailer
-      if (process.env.SMTP_HOST) {
-        const nodemailer = await import('nodemailer');
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: parseInt(process.env.SMTP_PORT || '587'),
-          secure: process.env.SMTP_SECURE === 'true',
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-        });
-
-        await transporter.sendMail({
-          from: process.env.SMTP_FROM || 'lerp@noreply.com',
-          to: email,
-          subject,
-          html,
-        });
-        console.log(`[Email] Sent successfully to: ${email}`);
-      } else {
-        console.log(`[Email] SMTP not configured - skipping email to: ${email}`);
-      }
+      console.log(`[Email] Sending to: ${email}`);
+      const info = await transporter.sendMail({ from, to: email, subject, html });
+      console.log(`[Email] ✅ Sent to ${email} — messageId: ${info.messageId}`);
     } catch (err) {
-      console.error(`[Email] Failed to send to ${email}:`, err);
-      // Don't throw - emails are best-effort
+      console.error(`[Email] ❌ Failed to send to ${email}:`, err);
+      // Don't throw — emails are best-effort
     }
   });
 
-  // Fire and forget - don't await
   Promise.all(sendPromises).catch((err) => {
     console.error('[Email] Batch send error:', err);
   });
