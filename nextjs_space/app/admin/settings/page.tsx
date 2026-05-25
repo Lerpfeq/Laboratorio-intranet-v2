@@ -42,6 +42,7 @@ export default function AdminSettingsPage() {
 
   const [message, setMessage] = useState('');
   const [seeding, setSeeding] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   // Auth guard
   useEffect(() => {
@@ -138,6 +139,27 @@ export default function AdminSettingsPage() {
     }
   };
 
+  /* ── Update Reagents ── */
+  const handleUpdateReagents = async () => {
+    if (!confirm('📋 This will update ~230 reagents with new expiry dates, concentrations, quantities and brands from the spreadsheet.\n\nContinue?')) return;
+    setUpdating(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/admin/update-reagents', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        const { results } = data;
+        setMessage(`✅ Update completed!\n📊 Total: ${results.total}\n✅ Updated: ${results.updated}\n⚠️ Not Found: ${results.notFound}\n❌ Errors: ${results.errors}`);
+      } else {
+        setMessage(`❌ Error: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setMessage(`❌ Error: ${err.message}`);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   if (status === 'loading' || loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
@@ -218,6 +240,43 @@ export default function AdminSettingsPage() {
             </button>
           </div>
         )}
+
+        {/* ────── UPDATE REAGENTS BUTTON ────── */}
+        <div
+          style={{
+            padding: '16px 20px',
+            marginBottom: '2rem',
+            borderRadius: '8px',
+            background: '#fff3e0',
+            border: '1px solid #ffb74d',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <strong style={{ color: '#e65100' }}>📋 Update Reagent Database</strong>
+            <p style={{ margin: '4px 0 0', color: '#ef6c00', fontSize: '14px' }}>
+              Update ~230 reagents with corrected expiry dates, concentrations, quantities and brands from spreadsheet.
+            </p>
+          </div>
+          <button
+            onClick={handleUpdateReagents}
+            disabled={updating}
+            className="button"
+            style={{
+              whiteSpace: 'nowrap',
+              opacity: updating ? 0.6 : 1,
+              background: '#ff9800',
+              color: 'white',
+              border: 'none',
+            }}
+          >
+            {updating ? '⏳ Updating...' : '📋 Update Reagents'}
+          </button>
+        </div>
 
         {/* ────── CATEGORIES ────── */}
         <section style={{ marginBottom: '3rem' }}>
