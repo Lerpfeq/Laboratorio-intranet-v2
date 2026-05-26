@@ -72,6 +72,7 @@ function normalizeCodigo(codigo: string): string {
     'LERP-V539': 'LERP-V5390',   // Adicionar zero final
     'LERP-P607': 'LERP-P6070',   // Adicionar zero final
     'LERP-H987': 'LERP-H9870',   // Adicionar zero final
+    'LERP-Y9885': 'LERP-Y9385',  // Erro de digitação: 9885 → 9385
   };
   
   if (corrections[codigo]) {

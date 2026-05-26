@@ -271,12 +271,13 @@ function normalizeCodigo(codigo: string): string {
   // LERPC6176 → LERP-C6176
   codigo = codigo.replace('LERPC', 'LERP-C');
   
-  // Correções específicas baseadas nos 10 códigos problemáticos
+  // Correções específicas baseadas nos códigos problemáticos
   const corrections: Record<string, string> = {
     'LERP-07863': 'LERP-7863',   // Remover zero inicial
     'LERP-V539': 'LERP-V5390',   // Adicionar zero final (padrão: LERP-LXXXX)
     'LERP-P607': 'LERP-P6070',   // Adicionar zero final
     'LERP-H987': 'LERP-H9870',   // Adicionar zero final
+    'LERP-Y9885': 'LERP-Y9385',  // Erro de digitação: 9885 → 9385
   };
   
   if (corrections[codigo]) {

@@ -45,6 +45,8 @@ export default function AdminSettingsPage() {
   const [updating, setUpdating] = useState(false);
   const [checking, setChecking] = useState(false);
   const [missingCodes, setMissingCodes] = useState<string[]>([]);
+  const [investigating, setInvestigating] = useState(false);
+  const [similarResults, setSimilarResults] = useState<any[]>([]);
 
   // Auth guard
   useEffect(() => {
@@ -183,6 +185,27 @@ export default function AdminSettingsPage() {
     }
   };
 
+  /* ── Investigate Similar Codes ── */
+  const handleInvestigate = async () => {
+    setInvestigating(true);
+    setMessage('');
+    setSimilarResults([]);
+    try {
+      const res = await fetch('/api/admin/find-similar-codes');
+      const data = await res.json();
+      if (data.success) {
+        setSimilarResults(data.results || []);
+        setMessage(`🔍 Investigation completed! Found ${data.results.length} codes to analyze.`);
+      } else {
+        setMessage(`❌ Error: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setMessage(`❌ Error: ${err.message}`);
+    } finally {
+      setInvestigating(false);
+    }
+  };
+
   if (status === 'loading' || loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
@@ -287,6 +310,20 @@ export default function AdminSettingsPage() {
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
+              onClick={handleInvestigate}
+              disabled={investigating}
+              className="button"
+              style={{
+                whiteSpace: 'nowrap',
+                opacity: investigating ? 0.6 : 1,
+                background: '#9c27b0',
+                color: 'white',
+                border: 'none',
+              }}
+            >
+              {investigating ? '⏳ Investigating...' : '🔬 Investigate'}
+            </button>
+            <button
               onClick={handleCheckMissing}
               disabled={checking}
               className="button"
@@ -347,6 +384,68 @@ export default function AdminSettingsPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ────── INVESTIGATION RESULTS ────── */}
+        {similarResults.length > 0 && (
+          <div
+            style={{
+              padding: '16px 20px',
+              marginBottom: '2rem',
+              borderRadius: '8px',
+              background: '#f3e5f5',
+              border: '1px solid #ba68c8',
+            }}
+          >
+            <strong style={{ color: '#6a1b9a', display: 'block', marginBottom: '1rem' }}>
+              🔬 Investigation Results:
+            </strong>
+            {similarResults.map((result, idx) => (
+              <div
+                key={idx}
+                style={{
+                  marginBottom: '1rem',
+                  padding: '12px',
+                  background: 'white',
+                  borderRadius: '6px',
+                  border: '1px solid #e1bee7',
+                }}
+              >
+                <div style={{ marginBottom: '8px' }}>
+                  <strong style={{ color: '#7b1fa2', fontFamily: 'monospace', fontSize: '14px' }}>
+                    {result.original}
+                  </strong>
+                  <span style={{ marginLeft: '8px', fontSize: '12px', color: '#666' }}>
+                    (Letter: {result.letterPart}, Numbers: {result.numPart})
+                  </span>
+                </div>
+                {result.similar.length > 0 ? (
+                  <div style={{ fontSize: '13px' }}>
+                    <div style={{ color: '#8e24aa', marginBottom: '4px' }}>
+                      Found {result.similarCount} similar code(s):
+                    </div>
+                    {result.similar.map((sim: any, i: number) => (
+                      <div
+                        key={i}
+                        style={{
+                          padding: '4px 8px',
+                          marginBottom: '2px',
+                          background: '#fce4ec',
+                          borderRadius: '4px',
+                          fontFamily: 'monospace',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <strong>{sim.code}</strong> - {sim.name}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '13px', color: '#999' }}>No similar codes found</div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
