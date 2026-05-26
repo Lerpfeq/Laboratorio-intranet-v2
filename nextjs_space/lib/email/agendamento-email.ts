@@ -26,6 +26,8 @@ function createTransporter() {
   const user = process.env.EMAIL_USER || 'lerpfeq@gmail.com';
   const pass = process.env.EMAIL_PASS || '';
 
+  console.log(`[Email] createTransporter: user=${user}, pass=${pass ? '***configured***' : '⚠️ EMPTY'}`);
+
   if (!pass) {
     console.warn('[Email] EMAIL_PASS not configured — emails will be skipped');
     return null;

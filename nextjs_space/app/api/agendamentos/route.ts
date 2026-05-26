@@ -205,16 +205,22 @@ export async function POST(request: NextRequest) {
       fimRaw: fimDate.toISOString(),
     };
 
-    console.log('[Agendamento] 📧 Queuing email (fire-and-forget)...');
+    console.log('[Agendamento] 📧 Sending email notification...');
     console.log('[Agendamento] paraQuem:', paraQuem, '| isExterno:', isExterno);
     console.log('[Agendamento] paraQuemEmail:', paraQuemEmail);
+    console.log('[Agendamento] responsavelEmails:', responsavelEmails);
+    console.log('[Agendamento] criadoPorEmail:', emailPayload.criadoPorEmail);
 
-    // Fire-and-forget: NO await — response returns immediately
-    sendAgendamentoEmails(emailPayload, responsavelEmails, isExterno)
-      .then(() => console.log('[Agendamento] ✅ Email delivery completed in background'))
-      .catch((err) => console.error('[Agendamento] ❌ Email delivery failed in background:', err));
+    // MUST await: Next.js App Router kills background promises after response is sent.
+    // The email function has internal timeouts (10s per email, 15s batch) so it won't hang.
+    try {
+      await sendAgendamentoEmails(emailPayload, responsavelEmails, isExterno);
+      console.log('[Agendamento] ✅ Email delivery completed');
+    } catch (emailErr: any) {
+      // Email failure should NEVER block the booking response
+      console.error('[Agendamento] ❌ Email delivery failed:', emailErr?.message || emailErr);
+    }
 
-    // Return response IMMEDIATELY — user sees success right away
     return NextResponse.json(booking, { status: 201 });
   } catch (error: any) {
     console.error('Agendamentos POST error:', error);
