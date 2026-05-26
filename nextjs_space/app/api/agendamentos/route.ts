@@ -180,12 +180,28 @@ export async function POST(request: NextRequest) {
       paraQuemEmail = emailExterno || '';
     }
 
-    // ── EMAIL: Fire-and-forget ──
-    // Booking is already saved in DB above — email is just a notification.
-    // NEVER await here: if SMTP is slow/down the user would stare at "Saving..." forever.
+    // ── EMAIL NOTIFICATION ──
+    // Booking is saved in DB above — email is a notification.
+    // We MUST await (Next.js App Router kills unawaited background promises).
+    // The email function has internal timeouts (10s per email, 15s batch).
+    console.log('════════════════════════════════════════════════');
+    console.log('[Agendamento] 📧 EMAIL SECTION START');
+    console.log('[Agendamento] Timestamp:', new Date().toISOString());
+    console.log('[Agendamento] EMAIL_USER defined?', !!process.env.EMAIL_USER, '| value:', process.env.EMAIL_USER || '(empty)');
+    console.log('[Agendamento] EMAIL_PASS defined?', !!process.env.EMAIL_PASS, '| length:', (process.env.EMAIL_PASS || '').length);
+
     const responsavelEmails = equipamento.autorizacoes
       .map((a) => a.user.email)
       .filter(Boolean) as string[];
+
+    console.log('[Agendamento] Equipment:', equipamento.nome);
+    console.log('[Agendamento] Equipment managers (responsáveis):', responsavelEmails);
+    console.log('[Agendamento] paraQuem:', paraQuem, '| isExterno:', isExterno);
+    console.log('[Agendamento] Creator:', user.name, '|', user.email);
+    console.log('[Agendamento] Target user name:', paraQuemNome, '| email:', paraQuemEmail);
+    if (isExterno) {
+      console.log('[Agendamento] External advisor email:', emailOrientador?.trim() || '(none)');
+    }
 
     const formatDate = (d: Date) =>
       d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -205,21 +221,29 @@ export async function POST(request: NextRequest) {
       fimRaw: fimDate.toISOString(),
     };
 
-    console.log('[Agendamento] 📧 Sending email notification...');
-    console.log('[Agendamento] paraQuem:', paraQuem, '| isExterno:', isExterno);
-    console.log('[Agendamento] paraQuemEmail:', paraQuemEmail);
-    console.log('[Agendamento] responsavelEmails:', responsavelEmails);
-    console.log('[Agendamento] criadoPorEmail:', emailPayload.criadoPorEmail);
+    console.log('[Agendamento] Email payload constructed:', JSON.stringify({
+      equipamentoNome: emailPayload.equipamentoNome,
+      criadoPorEmail: emailPayload.criadoPorEmail,
+      paraQuemEmail: emailPayload.paraQuemEmail,
+      emailOrientador: emailPayload.emailOrientador,
+      inicio: emailPayload.inicio,
+      fim: emailPayload.fim,
+    }));
+    console.log('[Agendamento] Calling sendAgendamentoEmails NOW...');
 
-    // MUST await: Next.js App Router kills background promises after response is sent.
-    // The email function has internal timeouts (10s per email, 15s batch) so it won't hang.
+    const emailStartTime = Date.now();
     try {
       await sendAgendamentoEmails(emailPayload, responsavelEmails, isExterno);
-      console.log('[Agendamento] ✅ Email delivery completed');
+      const emailElapsed = Date.now() - emailStartTime;
+      console.log(`[Agendamento] ✅ Email delivery completed in ${emailElapsed}ms`);
     } catch (emailErr: any) {
+      const emailElapsed = Date.now() - emailStartTime;
       // Email failure should NEVER block the booking response
-      console.error('[Agendamento] ❌ Email delivery failed:', emailErr?.message || emailErr);
+      console.error(`[Agendamento] ❌ Email delivery FAILED after ${emailElapsed}ms:`, emailErr?.message || emailErr);
+      console.error('[Agendamento] ❌ Full error:', emailErr);
     }
+    console.log('[Agendamento] 📧 EMAIL SECTION END');
+    console.log('════════════════════════════════════════════════');
 
     return NextResponse.json(booking, { status: 201 });
   } catch (error: any) {

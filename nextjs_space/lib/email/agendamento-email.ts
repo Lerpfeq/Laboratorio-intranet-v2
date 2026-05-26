@@ -175,30 +175,53 @@ export async function sendAgendamentoEmails(
   responsavelEmails: string[],
   isExterno: boolean
 ): Promise<void> {
+  console.log('[Email] ┌─── sendAgendamentoEmails CALLED ───');
+  console.log('[Email] │ Timestamp:', new Date().toISOString());
+  console.log('[Email] │ Equipment:', data.equipamentoNome);
+  console.log('[Email] │ isExterno:', isExterno);
+
   const transporter = createTransporter();
 
   if (!transporter) {
-    console.log('[Email] Transporter not available — skipping all emails');
+    console.log('[Email] │ ⚠️ Transporter is NULL — emails will be SKIPPED');
+    console.log('[Email] │ This means EMAIL_PASS is not configured!');
+    console.log('[Email] └─── sendAgendamentoEmails END (skipped) ───');
     return;
   }
+  console.log('[Email] │ ✅ Transporter created successfully');
 
   // Collect all recipients
   const recipients = new Set<string>();
 
   // Creator always receives
-  if (data.criadoPorEmail) recipients.add(data.criadoPorEmail);
+  if (data.criadoPorEmail) {
+    recipients.add(data.criadoPorEmail);
+    console.log('[Email] │ + Creator email:', data.criadoPorEmail);
+  } else {
+    console.log('[Email] │ ⚠️ No creator email (criadoPorEmail is empty)');
+  }
 
   // Target user
-  if (data.paraQuemEmail) recipients.add(data.paraQuemEmail);
+  if (data.paraQuemEmail) {
+    recipients.add(data.paraQuemEmail);
+    console.log('[Email] │ + Target user email:', data.paraQuemEmail);
+  } else {
+    console.log('[Email] │ ⚠️ No target email (paraQuemEmail is empty)');
+  }
 
   // Equipment managers / responsáveis
+  console.log('[Email] │ Responsável emails received:', responsavelEmails);
   for (const email of responsavelEmails) {
-    if (email) recipients.add(email);
+    if (email) {
+      recipients.add(email);
+      console.log('[Email] │ + Manager email:', email);
+    }
   }
 
   // External: also send to advisor
   if (isExterno && data.emailOrientador) {
     recipients.add(data.emailOrientador);
+    console.log('[Email] │ + Advisor email:', data.emailOrientador);
   }
 
   // Generate Google Calendar link if raw dates available
@@ -218,6 +241,7 @@ export async function sendAgendamentoEmails(
       data.fimRaw,
       'LERP — FEQ/UNICAMP'
     );
+    console.log('[Email] │ Google Calendar link generated');
   }
 
   const html = formatEmailHtml(data, googleCalLink);
@@ -225,20 +249,35 @@ export async function sendAgendamentoEmails(
   const from = `"LERP — FEQ/UNICAMP" <${process.env.EMAIL_USER || 'lerpfeq@gmail.com'}>`;
 
   const recipientList = Array.from(recipients);
-  console.log(`[Email] Total recipients (${recipientList.length}):`, recipientList);
+  console.log(`[Email] │ FINAL recipient list (${recipientList.length}):`, recipientList);
+
+  if (recipientList.length === 0) {
+    console.log('[Email] │ ⚠️ NO RECIPIENTS — no emails will be sent!');
+    console.log('[Email] └─── sendAgendamentoEmails END (no recipients) ───');
+    transporter.close();
+    return;
+  }
 
   // Send each email with a per-recipient 10s timeout
+  const results: { email: string; ok: boolean; error?: string; messageId?: string }[] = [];
+
   const sendPromises = recipientList.map(async (email) => {
     try {
-      console.log(`[Email] Sending to: ${email}`);
+      console.log(`[Email] │ 📤 Sending to: ${email}...`);
+      const startMs = Date.now();
       const info = await withTimeout(
         transporter.sendMail({ from, to: email, subject, html }),
         10000,
         `sendMail(${email})`
       );
-      console.log(`[Email] ✅ Sent to ${email} — messageId: ${info.messageId}`);
+      const elapsed = Date.now() - startMs;
+      console.log(`[Email] │ ✅ Sent to ${email} in ${elapsed}ms — messageId: ${info.messageId}`);
+      console.log(`[Email] │    SMTP response: ${info.response}`);
+      results.push({ email, ok: true, messageId: info.messageId });
     } catch (err: any) {
-      console.error(`[Email] ❌ Failed to send to ${email}:`, err?.message || err);
+      const errMsg = err?.message || String(err);
+      console.error(`[Email] │ ❌ FAILED to send to ${email}: ${errMsg}`);
+      results.push({ email, ok: false, error: errMsg });
       // Don't throw — emails are best-effort
     }
   });
@@ -246,11 +285,15 @@ export async function sendAgendamentoEmails(
   // Global 15s timeout for the entire batch
   try {
     await withTimeout(Promise.all(sendPromises), 15000, 'all emails batch');
-    console.log(`[Email] ✅ All ${recipientList.length} emails processed`);
+    console.log(`[Email] │ ✅ Batch complete: ${results.filter(r => r.ok).length}/${recipientList.length} sent`);
   } catch (err: any) {
-    console.error('[Email] ⏱️ Batch timed out or failed:', err?.message || err);
+    console.error('[Email] │ ⏱️ Batch timed out or failed:', err?.message || err);
   } finally {
     // Close transporter to release socket — prevents hanging connections
     transporter.close();
+    console.log('[Email] │ Transporter closed');
   }
+
+  console.log('[Email] │ Results:', JSON.stringify(results));
+  console.log('[Email] └─── sendAgendamentoEmails END ───');
 }
