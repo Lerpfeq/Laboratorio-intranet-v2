@@ -270,6 +270,19 @@ function normalizeCodigo(codigo: string): string {
   codigo = codigo.replace('LEPR-', 'LERP-');
   // LERPC6176 → LERP-C6176
   codigo = codigo.replace('LERPC', 'LERP-C');
+  
+  // Correções específicas baseadas nos 10 códigos problemáticos
+  const corrections: Record<string, string> = {
+    'LERP-07863': 'LERP-7863',   // Remover zero inicial
+    'LERP-V539': 'LERP-V5390',   // Adicionar zero final (padrão: LERP-LXXXX)
+    'LERP-P607': 'LERP-P6070',   // Adicionar zero final
+    'LERP-H987': 'LERP-H9870',   // Adicionar zero final
+  };
+  
+  if (corrections[codigo]) {
+    return corrections[codigo];
+  }
+  
   return codigo;
 }
 
@@ -321,10 +334,31 @@ export async function POST(request: NextRequest) {
       try {
         const codigo = normalizeCodigo(item.codigo);
         
-        // Buscar reagente entrada (frasco) pelo código interno
-        const entrada = await prisma.reagenteEntrada.findUnique({
+        // Buscar reagente entrada (frasco) pelo código interno (busca exata)
+        let entrada = await prisma.reagenteEntrada.findUnique({
           where: { codigoInterno: codigo },
         });
+
+        // Se não encontrou, tentar variações (fuzzy match)
+        if (!entrada) {
+          // Extrair parte numérica para buscar variações
+          const numPart = codigo.replace('LERP-', '').replace(/^[A-Z]+/, ''); // Remove letras iniciais
+          
+          // Tentar buscar códigos que contenham essa sequência numérica
+          const possibleMatches = await prisma.reagenteEntrada.findMany({
+            where: {
+              codigoInterno: {
+                contains: numPart,
+              },
+            },
+            take: 1, // Pega apenas o primeiro match
+          });
+
+          if (possibleMatches.length > 0) {
+            entrada = possibleMatches[0];
+            console.log(`🔄 Fuzzy match: ${codigo} → ${entrada.codigoInterno}`);
+          }
+        }
 
         if (!entrada) {
           console.log(`⚠️  Not found: ${codigo}`);
