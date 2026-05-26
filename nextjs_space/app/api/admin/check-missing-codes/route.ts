@@ -61,9 +61,23 @@ const CODES = [
 ];
 
 function normalizeCodigo(codigo: string): string {
+  // Normalizações básicas
   codigo = codigo.replace('LERP´-', 'LERP-');
   codigo = codigo.replace('LEPR-', 'LERP-');
   codigo = codigo.replace('LERPC', 'LERP-C');
+  
+  // Correções específicas (mesmas do update-reagents)
+  const corrections: Record<string, string> = {
+    'LERP-07863': 'LERP-7863',   // Remover zero inicial
+    'LERP-V539': 'LERP-V5390',   // Adicionar zero final
+    'LERP-P607': 'LERP-P6070',   // Adicionar zero final
+    'LERP-H987': 'LERP-H9870',   // Adicionar zero final
+  };
+  
+  if (corrections[codigo]) {
+    return corrections[codigo];
+  }
+  
   return codigo;
 }
 
@@ -84,9 +98,28 @@ export async function GET(request: NextRequest) {
 
     for (const codigo of CODES) {
       const normalized = normalizeCodigo(codigo);
-      const entrada = await prisma.reagenteEntrada.findUnique({
+      
+      // Busca exata
+      let entrada = await prisma.reagenteEntrada.findUnique({
         where: { codigoInterno: normalized },
       });
+
+      // Se não encontrou, tentar fuzzy match (mesma lógica do update)
+      if (!entrada) {
+        const numPart = normalized.replace('LERP-', '').replace(/^[A-Z]+/, '');
+        const possibleMatches = await prisma.reagenteEntrada.findMany({
+          where: {
+            codigoInterno: {
+              contains: numPart,
+            },
+          },
+          take: 1,
+        });
+
+        if (possibleMatches.length > 0) {
+          entrada = possibleMatches[0];
+        }
+      }
 
       if (entrada) {
         found.push(normalized);
