@@ -47,6 +47,8 @@ export default function AdminSettingsPage() {
   const [missingCodes, setMissingCodes] = useState<string[]>([]);
   const [investigating, setInvestigating] = useState(false);
   const [similarResults, setSimilarResults] = useState<any[]>([]);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [emailResult, setEmailResult] = useState<any>(null);
 
   // Auth guard
   useEffect(() => {
@@ -206,6 +208,30 @@ export default function AdminSettingsPage() {
     }
   };
 
+  /* ── Test Email System ── */
+  const handleTestEmail = async () => {
+    setTestingEmail(true);
+    setEmailResult(null);
+    setMessage('');
+    const startTime = Date.now();
+    try {
+      const res = await fetch('/api/test-email', { method: 'POST' });
+      const data = await res.json();
+      const elapsed = Date.now() - startTime;
+      setEmailResult({ ...data, totalElapsed: elapsed });
+      if (data.success) {
+        setMessage(`✅ Test email sent to ${data.message?.replace('Test email sent to ', '') || user?.email}`);
+      } else {
+        setMessage(`❌ Email test failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setEmailResult({ success: false, error: err.message, totalElapsed: Date.now() - startTime });
+      setMessage(`❌ Error: ${err.message}`);
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   if (status === 'loading' || loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
@@ -253,6 +279,143 @@ export default function AdminSettingsPage() {
             {message}
           </div>
         )}
+
+        {/* ────── TEST EMAIL SYSTEM ────── */}
+        <div
+          style={{
+            padding: '16px 20px',
+            marginBottom: '2rem',
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #e8f5e9 0%, #e3f2fd 100%)',
+            border: '1px solid #81c784',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <strong style={{ color: '#2e7d32', fontSize: '15px' }}>📧 Test Email System</strong>
+              <p style={{ margin: '4px 0 0', color: '#558b2f', fontSize: '14px' }}>
+                Send a test email to <strong>{user?.email || 'your address'}</strong> to verify SMTP is working.
+              </p>
+            </div>
+            <button
+              onClick={handleTestEmail}
+              disabled={testingEmail}
+              style={{
+                whiteSpace: 'nowrap',
+                padding: '10px 22px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: 'white',
+                background: testingEmail ? '#9e9e9e' : 'linear-gradient(135deg, #43a047, #1b5e20)',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: testingEmail ? 'not-allowed' : 'pointer',
+                boxShadow: testingEmail ? 'none' : '0 2px 8px rgba(46,125,50,0.3)',
+                transition: 'all 0.2s',
+              }}
+            >
+              {testingEmail ? '⏳ Sending...' : '📧 Test Email System'}
+            </button>
+          </div>
+
+          {/* ── Email Test Result ── */}
+          {emailResult && (
+            <div
+              style={{
+                marginTop: '14px',
+                padding: '14px 16px',
+                borderRadius: '6px',
+                background: emailResult.success ? '#f1f8e9' : '#ffebee',
+                border: `1px solid ${emailResult.success ? '#aed581' : '#ef9a9a'}`,
+                fontSize: '13px',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', marginBottom: '8px', color: emailResult.success ? '#33691e' : '#b71c1c' }}>
+                {emailResult.success ? '✅ Email sent successfully!' : `❌ Failed: ${emailResult.error}`}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', color: '#555' }}>
+                {emailResult.message && (
+                  <>
+                    <span style={{ fontWeight: 600 }}>📬 Sent to:</span>
+                    <span>{emailResult.message?.replace('Test email sent to ', '') || '—'}</span>
+                  </>
+                )}
+                {emailResult.messageId && (
+                  <>
+                    <span style={{ fontWeight: 600 }}>🆔 Message ID:</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all' }}>{emailResult.messageId}</span>
+                  </>
+                )}
+                {emailResult.elapsedMs != null && (
+                  <>
+                    <span style={{ fontWeight: 600 }}>⚡ SMTP time:</span>
+                    <span>{emailResult.elapsedMs}ms</span>
+                  </>
+                )}
+                {emailResult.totalElapsed != null && (
+                  <>
+                    <span style={{ fontWeight: 600 }}>⏱️ Total time:</span>
+                    <span>{emailResult.totalElapsed}ms</span>
+                  </>
+                )}
+                {emailResult.smtpResponse && (
+                  <>
+                    <span style={{ fontWeight: 600 }}>📡 SMTP:</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{emailResult.smtpResponse}</span>
+                  </>
+                )}
+              </div>
+
+              {/* Step-by-step log */}
+              {emailResult.steps && emailResult.steps.length > 0 && (
+                <details style={{ marginTop: '10px' }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#666', fontSize: '12px' }}>
+                    📋 Detailed log ({emailResult.steps.length} steps)
+                  </summary>
+                  <div
+                    style={{
+                      marginTop: '6px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      fontFamily: 'monospace',
+                      fontSize: '11px',
+                      background: '#fafafa',
+                      padding: '8px',
+                      borderRadius: '4px',
+                      lineHeight: '1.6',
+                    }}
+                  >
+                    {emailResult.steps.map((s: any, i: number) => (
+                      <div key={i} style={{ borderBottom: '1px solid #eee', paddingBottom: '2px', marginBottom: '2px' }}>
+                        <span style={{ color: '#999' }}>{i + 1}.</span>{' '}
+                        <strong style={{ color: '#333' }}>{s.step}:</strong>{' '}
+                        <span style={{ color: s.result?.includes('✅') ? '#2e7d32' : s.result?.includes('❌') ? '#c62828' : '#555' }}>
+                          {s.result}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {/* Fix suggestion for failures */}
+              {emailResult.fix && (
+                <div style={{ marginTop: '8px', padding: '8px', background: '#fff8e1', borderRadius: '4px', fontSize: '12px', color: '#f57f17' }}>
+                  💡 <strong>Fix:</strong> {emailResult.fix}
+                </div>
+              )}
+              {emailResult.possibleCauses && (
+                <div style={{ marginTop: '8px', padding: '8px', background: '#fff8e1', borderRadius: '4px', fontSize: '12px', color: '#f57f17' }}>
+                  💡 <strong>Possible causes:</strong>
+                  <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                    {emailResult.possibleCauses.map((c: string, i: number) => <li key={i}>{c}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* ────── SEED BUTTON ────── */}
         {categories.length === 0 && locations.length === 0 && (
