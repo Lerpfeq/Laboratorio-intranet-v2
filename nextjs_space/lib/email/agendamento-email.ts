@@ -34,11 +34,16 @@ function createTransporter() {
   }
 
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,             // STARTTLS — upgrade after connect
     auth: { user, pass },
-    connectionTimeout: 10000,  // 10s to establish connection
-    greetingTimeout: 10000,    // 10s for SMTP greeting
-    socketTimeout: 10000,      // 10s for socket inactivity
+    connectionTimeout: 15000,  // 15s to establish connection
+    greetingTimeout: 15000,    // 15s for SMTP greeting
+    socketTimeout: 15000,      // 15s for socket inactivity
+    tls: {
+      rejectUnauthorized: false, // accept self-signed certs in cloud envs
+    },
   });
 }
 

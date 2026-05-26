@@ -68,13 +68,16 @@ export async function GET() {
     if (emailUser && emailPass) {
       try {
         const transporter = nodemailer.createTransport({
-          service: "gmail",
+          host: "smtp.gmail.com",
+          port: 587,
+          secure: false,
           auth: { user: emailUser, pass: emailPass },
-          connectionTimeout: 10000,
-          greetingTimeout: 10000,
-          socketTimeout: 10000,
+          connectionTimeout: 15000,
+          greetingTimeout: 15000,
+          socketTimeout: 15000,
+          tls: { rejectUnauthorized: false },
         });
-        log("Create transporter", "✅ Created successfully");
+        log("Create transporter", "✅ Created (port 587 STARTTLS)");
 
         // Step 5: Verify transporter (SMTP handshake)
         await transporter.verify();
@@ -184,13 +187,16 @@ export async function POST(request: NextRequest) {
     // Step 4: Create transporter
     log("Transporter", "Creating Gmail SMTP transporter...");
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
       auth: { user: emailUser || "lerpfeq@gmail.com", pass: emailPass },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 15000,
+      tls: { rejectUnauthorized: false },
     });
-    log("Transporter", "✅ Created");
+    log("Transporter", "✅ Created (port 587 STARTTLS)");
 
     // Step 5: Verify SMTP connection
     log("SMTP verify", "Verifying connection...");
@@ -208,7 +214,7 @@ export async function POST(request: NextRequest) {
           "Gmail App Password is invalid or revoked",
           "2-Factor Authentication not enabled on Gmail account",
           "Less Secure Apps access issues",
-          "Network/firewall blocking port 465/587",
+          "Network/firewall blocking port 587 (STARTTLS)",
         ],
       }, { status: 500 });
     }
