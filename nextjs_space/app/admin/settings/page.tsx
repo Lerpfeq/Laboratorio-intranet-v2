@@ -43,6 +43,8 @@ export default function AdminSettingsPage() {
   const [message, setMessage] = useState('');
   const [seeding, setSeeding] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [missingCodes, setMissingCodes] = useState<string[]>([]);
 
   // Auth guard
   useEffect(() => {
@@ -160,6 +162,27 @@ export default function AdminSettingsPage() {
     }
   };
 
+  /* ── Check Missing Codes ── */
+  const handleCheckMissing = async () => {
+    setChecking(true);
+    setMessage('');
+    setMissingCodes([]);
+    try {
+      const res = await fetch('/api/admin/check-missing-codes');
+      const data = await res.json();
+      if (data.success) {
+        setMissingCodes(data.missingCodes || []);
+        setMessage(`📊 Check completed!\n✅ Found: ${data.found}\n⚠️ Not Found: ${data.notFound}`);
+      } else {
+        setMessage(`❌ Error: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setMessage(`❌ Error: ${err.message}`);
+    } finally {
+      setChecking(false);
+    }
+  };
+
   if (status === 'loading' || loading) {
     return <div style={{ padding: '2rem' }}>Loading...</div>;
   }
@@ -262,21 +285,70 @@ export default function AdminSettingsPage() {
               Update ~230 reagents with corrected expiry dates, concentrations, quantities and brands from spreadsheet.
             </p>
           </div>
-          <button
-            onClick={handleUpdateReagents}
-            disabled={updating}
-            className="button"
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleCheckMissing}
+              disabled={checking}
+              className="button"
+              style={{
+                whiteSpace: 'nowrap',
+                opacity: checking ? 0.6 : 1,
+                background: '#2196f3',
+                color: 'white',
+                border: 'none',
+              }}
+            >
+              {checking ? '⏳ Checking...' : '🔍 Check Missing'}
+            </button>
+            <button
+              onClick={handleUpdateReagents}
+              disabled={updating}
+              className="button"
+              style={{
+                whiteSpace: 'nowrap',
+                opacity: updating ? 0.6 : 1,
+                background: '#ff9800',
+                color: 'white',
+                border: 'none',
+              }}
+            >
+              {updating ? '⏳ Updating...' : '📋 Update Reagents'}
+            </button>
+          </div>
+        </div>
+
+        {/* ────── MISSING CODES LIST ────── */}
+        {missingCodes.length > 0 && (
+          <div
             style={{
-              whiteSpace: 'nowrap',
-              opacity: updating ? 0.6 : 1,
-              background: '#ff9800',
-              color: 'white',
-              border: 'none',
+              padding: '16px 20px',
+              marginBottom: '2rem',
+              borderRadius: '8px',
+              background: '#ffebee',
+              border: '1px solid #ef5350',
             }}
           >
-            {updating ? '⏳ Updating...' : '📋 Update Reagents'}
-          </button>
-        </div>
+            <strong style={{ color: '#c62828', display: 'block', marginBottom: '0.5rem' }}>
+              ⚠️ Missing Codes ({missingCodes.length}):
+            </strong>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                gap: '0.5rem',
+                fontSize: '13px',
+                fontFamily: 'monospace',
+                color: '#b71c1c',
+              }}
+            >
+              {missingCodes.map((code) => (
+                <div key={code} style={{ padding: '4px 8px', background: 'white', borderRadius: '4px' }}>
+                  {code}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ────── CATEGORIES ────── */}
         <section style={{ marginBottom: '3rem' }}>
