@@ -28,10 +28,15 @@ export async function GET() {
       return `${val.slice(0, 3)}****${val.slice(-3)} (len=${val.length})`;
     };
 
+    // Transport detection
+    const activeTransport = process.env.RESEND_API_KEY ? "RESEND ✅" :
+                            process.env.EMAIL_PASS ? "SMTP ⚠️ (may be blocked)" : "NONE ❌";
+
     // Email-specific variables
     const emailVars: Record<string, any> = {};
-    const emailKeys = ["EMAIL_USER", "EMAIL_PASS", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE",
-                       "SENDGRID_API_KEY", "RESEND_API_KEY", "MAILGUN_API_KEY"];
+    const emailKeys = ["RESEND_API_KEY", "RESEND_FROM_EMAIL", "EMAIL_USER", "EMAIL_PASS",
+                       "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE",
+                       "SENDGRID_API_KEY", "MAILGUN_API_KEY"];
     for (const key of emailKeys) {
       const val = process.env[key];
       emailVars[key] = {
@@ -75,6 +80,7 @@ export async function GET() {
         memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
       },
 
+      activeTransport,
       emailConfig: emailVars,
 
       warnings: [
@@ -103,15 +109,16 @@ export async function GET() {
       },
 
       expectedConfig: {
-        note: "The code should be using these settings:",
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false,
-        auth: "EMAIL_USER + EMAIL_PASS from env",
-        tls: "rejectUnauthorized: false",
-        timeouts: "20000ms (connection, greeting, socket)",
-        debug: true,
-        logger: true,
+        note: "Priority: RESEND_API_KEY → EMAIL_PASS (SMTP) → none",
+        resend: {
+          required: "RESEND_API_KEY",
+          optional: "RESEND_FROM_EMAIL (defaults to onboarding@resend.dev)",
+          setup: "https://resend.com → API Keys → Create",
+        },
+        smtp_legacy: {
+          required: "EMAIL_USER + EMAIL_PASS",
+          warning: "Render blocks SMTP ports 465/587 — use Resend instead",
+        },
       },
     });
   } catch (error: any) {

@@ -1,7 +1,26 @@
-// Email notification utility for equipment bookings
-// Uses Gmail SMTP via nodemailer — includes Google Calendar link
-// Failures do NOT cancel the booking (fire-and-forget)
+// ════════════════════════════════════════════════════════════════════════
+// Email notification utility for LERP equipment bookings
+//
+// TRANSPORT STRATEGY (priority order):
+//   1. Resend (RESEND_API_KEY) — HTTP API, works everywhere (recommended)
+//   2. Gmail SMTP (EMAIL_USER + EMAIL_PASS) — legacy fallback
+//
+// WHY RESEND?
+//   Render.com blocks outbound SMTP ports (465 & 587). Resend uses HTTPS
+//   API calls instead, so it works on any cloud platform without firewall
+//   issues. Free tier: 100 emails/day — more than enough for a lab intranet.
+//
+// HOW TO SET UP RESEND:
+//   1. Create free account at https://resend.com
+//   2. Go to API Keys → Create API Key
+//   3. Add RESEND_API_KEY to Render environment variables
+//   4. (Optional) Verify a custom domain for branded "from" addresses
+//      Without a verified domain, use "onboarding@resend.dev" as sender
+//
+// NOTE: With Resend, EMAIL_USER / EMAIL_PASS are no longer needed.
+// ════════════════════════════════════════════════════════════════════════
 
+import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 
 /* ─────────── Types ─────────── */
@@ -21,26 +40,32 @@ interface BookingEmailData {
   fimRaw?: string;
 }
 
-/* ─────────── Gmail Transporter ─────────── */
-function createTransporter() {
+/* ─────────── Transport Detection ─────────── */
+type Transport = 'resend' | 'smtp' | 'none';
+
+function detectTransport(): Transport {
+  if (process.env.RESEND_API_KEY) return 'resend';
+  if (process.env.EMAIL_PASS) return 'smtp';
+  return 'none';
+}
+
+/* ─────────── Resend Client ─────────── */
+function getResendClient(): Resend | null {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return null;
+  return new Resend(key);
+}
+
+/* ─────────── Gmail SMTP Transporter (legacy fallback) ─────────── */
+function createSmtpTransporter() {
   const user = process.env.EMAIL_USER || 'lerpfeq@gmail.com';
   const pass = process.env.EMAIL_PASS || '';
 
-  console.log('╔══════════════════════════════════════════════════════╗');
-  console.log('║        [Email] createTransporter()                  ║');
-  console.log('╠══════════════════════════════════════════════════════╣');
-  console.log(`║ EMAIL_USER  = "${user}"`);
-  console.log(`║ EMAIL_PASS  = ${pass ? `SET (length=${pass.length}, first3="${pass.slice(0,3)}", last3="${pass.slice(-3)}")` : '⚠️ EMPTY / UNDEFINED'}`);
-  console.log(`║ Has spaces? = ${pass.includes(' ') ? '⚠️ YES — this may cause auth failure!' : '✅ No spaces'}`);
-  console.log(`║ NODE_ENV    = ${process.env.NODE_ENV || '(not set)'}`);
+  if (!pass) return null;
 
-  if (!pass) {
-    console.log('║ ❌ EMAIL_PASS not configured — emails will be SKIPPED');
-    console.log('╚══════════════════════════════════════════════════════╝');
-    return null;
-  }
+  console.log(`[Email] SMTP fallback: user=${user}, port=587, STARTTLS`);
 
-  const config = {
+  return nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
     secure: false,
@@ -48,20 +73,8 @@ function createTransporter() {
     connectionTimeout: 20000,
     greetingTimeout: 20000,
     socketTimeout: 20000,
-    tls: {
-      rejectUnauthorized: false,
-    },
-    debug: true,   // enable SMTP protocol debug output
-    logger: true,  // log SMTP traffic to console
-  };
-
-  console.log(`║ Config: host=${config.host}, port=${config.port}, secure=${config.secure}`);
-  console.log(`║ Timeouts: conn=${config.connectionTimeout}ms, greet=${config.greetingTimeout}ms, sock=${config.socketTimeout}ms`);
-  console.log(`║ TLS: rejectUnauthorized=${config.tls.rejectUnauthorized}`);
-  console.log(`║ Debug: ${config.debug}, Logger: ${config.logger}`);
-  console.log('╚══════════════════════════════════════════════════════╝');
-
-  return nodemailer.createTransport(config);
+    tls: { rejectUnauthorized: false },
+  });
 }
 
 /* ─────────── Google Calendar Link ─────────── */
@@ -191,85 +204,133 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]);
 }
 
-/* ─────────── Main Send Function ─────────── */
+/* ─────────── Send via Resend ─────────── */
+async function sendViaResend(
+  resend: Resend,
+  to: string,
+  subject: string,
+  html: string,
+  fromAddress: string,
+): Promise<{ ok: boolean; id?: string; error?: string; ms: number }> {
+  const startMs = Date.now();
+  try {
+    // Resend requires a verified domain OR use "onboarding@resend.dev" for testing.
+    // If EMAIL_USER is set and domain is verified in Resend, we use it.
+    // Otherwise default to onboarding@resend.dev which Resend provides for free.
+    const { data, error } = await resend.emails.send({
+      from: fromAddress,
+      to: [to],
+      subject,
+      html,
+    });
+
+    const ms = Date.now() - startMs;
+
+    if (error) {
+      console.error(`[Email/Resend] ❌ API error for ${to}: ${error.message}`);
+      return { ok: false, error: error.message, ms };
+    }
+
+    console.log(`[Email/Resend] ✅ Sent to ${to} in ${ms}ms — id: ${data?.id}`);
+    return { ok: true, id: data?.id, ms };
+  } catch (err: any) {
+    const ms = Date.now() - startMs;
+    console.error(`[Email/Resend] ❌ Exception for ${to}: ${err?.message}`);
+    return { ok: false, error: err?.message || String(err), ms };
+  }
+}
+
+/* ─────────── Send via SMTP (legacy fallback) ─────────── */
+async function sendViaSmtp(
+  transporter: nodemailer.Transporter,
+  to: string,
+  subject: string,
+  html: string,
+  from: string,
+): Promise<{ ok: boolean; messageId?: string; error?: string; ms: number }> {
+  const startMs = Date.now();
+  try {
+    const info = await withTimeout(
+      transporter.sendMail({ from, to, subject, html }),
+      20000,
+      `sendMail(${to})`
+    );
+    const ms = Date.now() - startMs;
+    console.log(`[Email/SMTP] ✅ Sent to ${to} in ${ms}ms — messageId: ${info.messageId}`);
+    return { ok: true, messageId: info.messageId, ms };
+  } catch (err: any) {
+    const ms = Date.now() - startMs;
+    console.error(`[Email/SMTP] ❌ Failed for ${to} after ${ms}ms: ${err?.message}`);
+    return { ok: false, error: err?.message || String(err), ms };
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   MAIN EXPORT — sendAgendamentoEmails()
+   Same signature as before — drop-in replacement.
+   ═════════════════════════════════════════════════════════════════════ */
 export async function sendAgendamentoEmails(
   data: BookingEmailData,
   responsavelEmails: string[],
   isExterno: boolean
 ): Promise<void> {
+  const transport = detectTransport();
+
   console.log('');
   console.log('╔══════════════════════════════════════════════════════════╗');
-  console.log('║   📧 sendAgendamentoEmails() CALLED                     ║');
+  console.log('║   📧 sendAgendamentoEmails()                            ║');
   console.log('╠══════════════════════════════════════════════════════════╣');
-  console.log(`║ Timestamp : ${new Date().toISOString()}`);
-  console.log(`║ Equipment : ${data.equipamentoNome}`);
-  console.log(`║ isExterno : ${isExterno}`);
-  console.log(`║ Creator   : ${data.criadoPor} <${data.criadoPorEmail}>`);
-  console.log(`║ Target    : ${data.paraQuem} <${data.paraQuemEmail || 'N/A'}>`);
-  console.log(`║ Advisor   : ${data.emailOrientador || 'N/A'}`);
-  console.log(`║ Responsáveis count: ${responsavelEmails.length}`);
-  console.log('╠══════════════════════════════════════════════════════════╣');
+  console.log(`║ Timestamp  : ${new Date().toISOString()}`);
+  console.log(`║ Transport  : ${transport.toUpperCase()}${transport === 'resend' ? ' ✅ (recommended)' : transport === 'smtp' ? ' ⚠️ (legacy)' : ' ❌'}`);
+  console.log(`║ Equipment  : ${data.equipamentoNome}`);
+  console.log(`║ isExterno  : ${isExterno}`);
+  console.log(`║ Creator    : ${data.criadoPor} <${data.criadoPorEmail}>`);
+  console.log(`║ Target     : ${data.paraQuem} <${data.paraQuemEmail || 'N/A'}>`);
+  console.log(`║ Advisor    : ${data.emailOrientador || 'N/A'}`);
+  console.log(`║ Managers   : ${responsavelEmails.length} [${responsavelEmails.join(', ')}]`);
 
-  const transporter = createTransporter();
-
-  if (!transporter) {
-    console.log('║ ❌ Transporter is NULL — emails will be SKIPPED');
-    console.log('║ This means EMAIL_PASS env var is EMPTY or UNDEFINED');
+  if (transport === 'none') {
+    console.log('║ ❌ No email transport configured!');
+    console.log('║   Set RESEND_API_KEY (recommended) or EMAIL_PASS (legacy)');
     console.log('╚══════════════════════════════════════════════════════════╝');
     return;
   }
-  console.log('║ ✅ Transporter created — now verifying SMTP connection...');
 
-  // ─── SMTP Verify step (NEW: explicitly test connection before sending) ───
-  try {
-    const verifyStart = Date.now();
-    await transporter.verify();
-    const verifyMs = Date.now() - verifyStart;
-    console.log(`║ ✅ SMTP VERIFY OK in ${verifyMs}ms — connection is alive`);
-  } catch (verifyErr: any) {
-    console.error(`║ ❌ SMTP VERIFY FAILED: ${verifyErr?.message || verifyErr}`);
-    console.error(`║ ❌ Full error:`, verifyErr);
-    console.error('║ ⚠️ Will still attempt to send — sometimes verify fails but send works');
-  }
-
-  // Collect all recipients
+  // ── Collect recipients ──
   const recipients = new Set<string>();
 
-  // Creator always receives
   if (data.criadoPorEmail) {
     recipients.add(data.criadoPorEmail);
-    console.log('[Email] │ + Creator email:', data.criadoPorEmail);
-  } else {
-    console.log('[Email] │ ⚠️ No creator email (criadoPorEmail is empty)');
+    console.log(`║ + Creator : ${data.criadoPorEmail}`);
   }
-
-  // Target user
   if (data.paraQuemEmail) {
     recipients.add(data.paraQuemEmail);
-    console.log('[Email] │ + Target user email:', data.paraQuemEmail);
-  } else {
-    console.log('[Email] │ ⚠️ No target email (paraQuemEmail is empty)');
+    console.log(`║ + Target  : ${data.paraQuemEmail}`);
   }
-
-  // Equipment managers / responsáveis
-  console.log('[Email] │ Responsável emails received:', responsavelEmails);
   for (const email of responsavelEmails) {
     if (email) {
       recipients.add(email);
-      console.log('[Email] │ + Manager email:', email);
+      console.log(`║ + Manager : ${email}`);
     }
   }
-
-  // External: also send to advisor
   if (isExterno && data.emailOrientador) {
     recipients.add(data.emailOrientador);
-    console.log('[Email] │ + Advisor email:', data.emailOrientador);
+    console.log(`║ + Advisor : ${data.emailOrientador}`);
   }
 
-  // Generate Google Calendar link if raw dates available
+  const recipientList = Array.from(recipients);
+  console.log(`║ Recipients : ${recipientList.length} unique`);
+
+  if (recipientList.length === 0) {
+    console.log('║ ⚠️ No recipients — skipping');
+    console.log('╚══════════════════════════════════════════════════════════╝');
+    return;
+  }
+
+  // ── Google Calendar link ──
   let googleCalLink: string | null = null;
   if (data.inicioRaw && data.fimRaw) {
-    const description = [
+    const desc = [
       `Equipment: ${data.equipamentoNome}`,
       `Booked by: ${data.criadoPor}`,
       `For: ${data.paraQuem}`,
@@ -278,71 +339,62 @@ export async function sendAgendamentoEmails(
 
     googleCalLink = generateGoogleCalendarLink(
       `LERP — ${data.equipamentoNome}`,
-      description,
+      desc,
       data.inicioRaw,
       data.fimRaw,
       'LERP — FEQ/UNICAMP'
     );
-    console.log('[Email] │ Google Calendar link generated');
+    console.log('║ Calendar link generated ✅');
   }
 
   const html = formatEmailHtml(data, googleCalLink);
   const subject = `📅 LERP — Scheduling Confirmed: ${data.equipamentoNome} — ${data.inicio}`;
-  const from = `"LERP — FEQ/UNICAMP" <${process.env.EMAIL_USER || 'lerpfeq@gmail.com'}>`;
 
-  const recipientList = Array.from(recipients);
-  console.log(`║ FINAL recipient list (${recipientList.length}):`, recipientList);
+  // ── Determine "from" address ──
+  // Resend: use onboarding@resend.dev (always works) OR a verified domain
+  // SMTP: use EMAIL_USER
+  const resendFrom = process.env.RESEND_FROM_EMAIL
+    || 'LERP — FEQ/UNICAMP <onboarding@resend.dev>';
+  const smtpFrom = `"LERP — FEQ/UNICAMP" <${process.env.EMAIL_USER || 'lerpfeq@gmail.com'}>`;
 
-  if (recipientList.length === 0) {
-    console.log('║ ⚠️ NO RECIPIENTS — no emails will be sent!');
-    console.log('╚══════════════════════════════════════════════════════════╝');
-    transporter.close();
-    return;
-  }
-
-  // Send each email individually (sequential — easier to debug)
-  const results: { email: string; ok: boolean; error?: string; messageId?: string; ms?: number }[] = [];
+  // ── SEND ──
+  const results: { email: string; ok: boolean; error?: string; id?: string; ms: number }[] = [];
   const batchStart = Date.now();
 
-  for (const email of recipientList) {
-    console.log(`║ ────────────────────────────────────────────`);
-    console.log(`║ 📤 SENDING to: ${email}`);
-    const startMs = Date.now();
-    try {
-      const info = await withTimeout(
-        transporter.sendMail({ from, to: email, subject, html }),
-        20000,
-        `sendMail(${email})`
-      );
-      const elapsed = Date.now() - startMs;
-      console.log(`║ ✅ SENT to ${email} in ${elapsed}ms`);
-      console.log(`║    messageId : ${info.messageId}`);
-      console.log(`║    response  : ${info.response}`);
-      console.log(`║    accepted  : ${JSON.stringify(info.accepted)}`);
-      console.log(`║    rejected  : ${JSON.stringify(info.rejected)}`);
-      results.push({ email, ok: true, messageId: info.messageId, ms: elapsed });
-    } catch (err: any) {
-      const elapsed = Date.now() - startMs;
-      const errMsg = err?.message || String(err);
-      console.error(`║ ❌ FAILED to send to ${email} after ${elapsed}ms`);
-      console.error(`║    Error: ${errMsg}`);
-      console.error(`║    Code : ${err?.code || 'N/A'}`);
-      console.error(`║    Command: ${err?.command || 'N/A'}`);
-      results.push({ email, ok: false, error: errMsg, ms: elapsed });
+  if (transport === 'resend') {
+    const resend = getResendClient()!;
+    console.log(`║ Using Resend API (from: ${resendFrom})`);
+
+    for (const email of recipientList) {
+      console.log(`║ ─── 📤 ${email} ───`);
+      const r = await sendViaResend(resend, email, subject, html, resendFrom);
+      results.push({ email, ...r });
     }
+  } else {
+    // SMTP fallback
+    const transporter = createSmtpTransporter()!;
+    console.log(`║ Using SMTP fallback (from: ${smtpFrom})`);
+    console.log('║ ⚠️ SMTP may fail if Render blocks port 587');
+
+    for (const email of recipientList) {
+      console.log(`║ ─── 📤 ${email} ───`);
+      const r = await sendViaSmtp(transporter, email, subject, html, smtpFrom);
+      results.push({ email, ok: r.ok, error: r.error, id: r.messageId, ms: r.ms });
+    }
+    transporter.close();
   }
 
-  const batchElapsed = Date.now() - batchStart;
+  const batchMs = Date.now() - batchStart;
+  const ok = results.filter(r => r.ok).length;
+  const fail = results.length - ok;
 
-  // Close transporter
-  transporter.close();
-
-  const successCount = results.filter(r => r.ok).length;
-  console.log(`║ ────────────────────────────────────────────`);
-  console.log(`║ 📊 BATCH SUMMARY`);
-  console.log(`║    Total: ${recipientList.length} | Sent: ${successCount} | Failed: ${recipientList.length - successCount}`);
-  console.log(`║    Total time: ${batchElapsed}ms`);
-  console.log(`║    Results: ${JSON.stringify(results)}`);
+  console.log('╠══════════════════════════════════════════════════════════╣');
+  console.log(`║ 📊 SUMMARY: ${ok}/${results.length} sent, ${fail} failed (${batchMs}ms)`);
+  if (fail > 0) {
+    for (const r of results.filter(r => !r.ok)) {
+      console.error(`║   ❌ ${r.email}: ${r.error}`);
+    }
+  }
   console.log('╚══════════════════════════════════════════════════════════╝');
   console.log('');
 }
