@@ -9,28 +9,27 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /**
- * GET  /api/test-email — Diagnostic: env vars + transport detection
+ * GET  /api/test-email — Ultra-verbose diagnostic (no email sent)
  * POST /api/test-email — Send a real test email (Admin only)
  *
  * Supports Resend (preferred) and SMTP (legacy fallback).
+ * FROM email hardcoded to "onboarding@resend.dev" for Resend testing.
  */
 
-/* helpers */
+/* ─── helpers ─── */
 const ts = () => new Date().toISOString();
 const mask = (v: string | undefined) => {
   if (!v) return "(undefined)";
-  if (v.length <= 6) return `****${v.length > 2 ? v.slice(-2) : ""}`;
-  return v.slice(0, 4) + "****" + v.slice(-4);
+  if (v.length <= 6) return `****(len=${v.length})`;
+  return v.slice(0, 4) + "****" + v.slice(-4) + ` (len=${v.length})`;
 };
 
-type Transport = "resend" | "smtp" | "none";
-function detectTransport(): Transport {
-  if (process.env.RESEND_API_KEY) return "resend";
-  if (process.env.EMAIL_PASS) return "smtp";
-  return "none";
-}
+/* ─── FROM address for Resend (hardcoded for reliability) ─── */
+const RESEND_FROM = "LERP <onboarding@resend.dev>";
 
-/* ═══════ GET: diagnostic ═══════ */
+/* ═══════════════════════════════════════════════════════════════ */
+/* GET: full diagnostic — env vars, key validation, API test     */
+/* ═══════════════════════════════════════════════════════════════ */
 export async function GET() {
   const steps: { time: string; step: string; result: string }[] = [];
   const log = (step: string, result: string) => {
@@ -39,88 +38,153 @@ export async function GET() {
   };
 
   try {
+    // Auth
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
     log("Auth", `userId=${session.user.id}`);
 
-    // Transport detection
-    const transport = detectTransport();
-    log("Transport", `${transport.toUpperCase()}${transport === "resend" ? " ✅" : transport === "smtp" ? " ⚠️ (may be blocked)" : " ❌"}`);
+    // ─── RESEND_API_KEY deep inspection ───
+    const rawKey = process.env.RESEND_API_KEY;
+    log("RESEND_API_KEY typeof", typeof rawKey);
+    log("RESEND_API_KEY undefined?", String(rawKey === undefined));
+    log("RESEND_API_KEY null?", String(rawKey === null));
+    log("RESEND_API_KEY empty?", String(rawKey === ""));
+    log("RESEND_API_KEY length", String(rawKey?.length ?? "N/A"));
+    log("RESEND_API_KEY trimmed length", String(rawKey?.trim()?.length ?? "N/A"));
+    log("RESEND_API_KEY first 10", rawKey ? `"${rawKey.slice(0, 10)}..."` : "N/A");
+    log("RESEND_API_KEY starts re_?", String(rawKey?.startsWith("re_") ?? "N/A"));
+    log("RESEND_API_KEY truthy?", String(!!rawKey));
 
-    // Env vars
-    const resendKey = process.env.RESEND_API_KEY;
+    // Check for whitespace issues
+    if (rawKey && rawKey !== rawKey.trim()) {
+      log("⚠️ WHITESPACE", `Key has extra whitespace! raw="${rawKey.length}" trimmed="${rawKey.trim().length}"`);
+    }
+
+    // ─── Other env vars ───
     const resendFrom = process.env.RESEND_FROM_EMAIL;
     const emailUser = process.env.EMAIL_USER;
     const emailPass = process.env.EMAIL_PASS;
 
-    log("RESEND_API_KEY", resendKey ? `SET (masked: ${mask(resendKey)}, len=${resendKey.length})` : "⚠️ NOT SET");
-    log("RESEND_FROM_EMAIL", resendFrom || "(not set — will use onboarding@resend.dev)");
-    log("EMAIL_USER", emailUser || "⚠️ NOT SET");
+    log("RESEND_FROM_EMAIL", resendFrom || `(not set — will use "${RESEND_FROM}")`);
+    log("EMAIL_USER", emailUser || "NOT SET");
     log("EMAIL_PASS", emailPass ? `SET (len=${emailPass.length})` : "NOT SET");
+    log("NODE_ENV", process.env.NODE_ENV || "not set");
 
-    // Test Resend connectivity
-    let resendOk = false;
+    // ─── Transport decision ───
+    const trimmedKey = rawKey?.trim();
+    let transport: string;
+    if (trimmedKey && trimmedKey.length > 0) {
+      transport = "RESEND ✅";
+    } else if (emailPass) {
+      transport = "SMTP ⚠️ (legacy, may be blocked)";
+    } else {
+      transport = "NONE ❌ (no RESEND_API_KEY or EMAIL_PASS)";
+    }
+    log("Selected transport", transport);
+    log("FROM email (Resend)", RESEND_FROM);
+
+    // ─── Scan ALL env vars for email/smtp/resend ───
+    const relatedVars: Record<string, string> = {};
+    for (const key of Object.keys(process.env).sort()) {
+      if (/email|mail|smtp|resend/i.test(key)) {
+        relatedVars[key] = mask(process.env[key]);
+      }
+    }
+    log("All related env vars", JSON.stringify(relatedVars));
+
+    // ─── Test Resend API key validity ───
+    let resendValid = false;
     let resendError = "";
-    if (resendKey) {
+    let resendDomains: string[] = [];
+
+    if (trimmedKey && trimmedKey.length > 0) {
+      log("Resend API test", "Testing API key by calling resend.domains.list()...");
       try {
-        const resend = new Resend(resendKey);
-        // Resend doesn't have a "verify" method, but we can list domains to test the key
-        const { data: domains, error } = await resend.domains.list();
-        if (error) {
-          resendError = error.message;
-          log("Resend API test", `❌ ${error.message}`);
+        const resend = new Resend(trimmedKey);
+        const listStart = Date.now();
+        const { data: domainsData, error: domainsError } = await resend.domains.list();
+        const listMs = Date.now() - listStart;
+
+        if (domainsError) {
+          resendError = domainsError.message;
+          log("Resend API test", `❌ API returned error in ${listMs}ms: ${domainsError.message}`);
+          log("Resend error details", JSON.stringify(domainsError));
+
+          // Diagnose
+          if (domainsError.message.includes("invalid") || domainsError.message.includes("unauthorized")) {
+            log("🔍 Diagnosis", "API key appears INVALID. Go to resend.com/api-keys and create a new one");
+          }
         } else {
-          resendOk = true;
-          const domainNames = domains?.data?.map((d: any) => `${d.name} (${d.status})`) || [];
-          log("Resend API test", `✅ API key valid — domains: ${domainNames.length > 0 ? domainNames.join(", ") : "(none — will use onboarding@resend.dev)"}`);
+          resendValid = true;
+          resendDomains = domainsData?.data?.map((d: any) => `${d.name} (${d.status})`) || [];
+          log("Resend API test", `✅ API key VALID in ${listMs}ms`);
+          log("Resend domains", resendDomains.length > 0 ? resendDomains.join(", ") : "(none — using onboarding@resend.dev)");
         }
       } catch (err: any) {
         resendError = err?.message || String(err);
-        log("Resend API test", `❌ ${resendError}`);
+        log("Resend API test", `❌ EXCEPTION: ${resendError}`);
+        log("Resend error type", err?.name || "unknown");
+        log("Resend error code", err?.statusCode || err?.status || err?.code || "N/A");
+
+        try {
+          log("Resend error full", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+        } catch {
+          log("Resend error string", String(err));
+        }
       }
+    } else {
+      log("Resend API test", "⏭️ Skipped — no RESEND_API_KEY set");
     }
 
-    // User info
+    // ─── User info ───
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     log("User", `${user?.name} <${user?.email}>, category=${user?.category}`);
 
     return NextResponse.json({
       success: true,
-      transport: transport,
+      transport,
+      fromEmail: RESEND_FROM,
       diagnostic: {
-        resendApiKeySet: !!resendKey,
-        resendApiKeyMasked: resendKey ? mask(resendKey) : null,
-        resendFromEmail: resendFrom || "onboarding@resend.dev (default)",
-        resendApiValid: resendOk,
-        resendError: resendError || null,
+        resendApiKey: {
+          set: !!rawKey,
+          length: rawKey?.length ?? 0,
+          trimmedLength: trimmedKey?.length ?? 0,
+          hasWhitespace: rawKey ? rawKey !== rawKey.trim() : false,
+          startsWithRe: rawKey?.startsWith("re_") ?? false,
+          first10: rawKey ? rawKey.slice(0, 10) + "..." : null,
+          valid: resendValid,
+          error: resendError || null,
+          domains: resendDomains,
+        },
+        fromEmail: RESEND_FROM,
         emailUser: emailUser || null,
         emailPassSet: !!emailPass,
         nodeEnv: process.env.NODE_ENV || null,
+        nodeVersion: process.version,
         userEmail: user?.email || null,
         isAdmin: user?.category === "Admin",
       },
+      allRelatedEnvVars: relatedVars,
       steps,
-      instructions: {
-        setupResend: [
-          "1. Go to https://resend.com — create free account",
-          "2. API Keys → Create API Key → copy it",
-          "3. Render Dashboard → lerp-intranet → Environment",
-          "4. Add: RESEND_API_KEY = re_xxxxxxxxxx",
-          "5. (Optional) Add: RESEND_FROM_EMAIL = LERP <noreply@yourdomain.com>",
-          "6. Redeploy (or it auto-deploys)",
-        ],
-        sendTestEmail: "POST /api/test-email — sends a real email (Admin only)",
+      howToFix: {
+        noApiKey: "Add RESEND_API_KEY to Render env vars (go to resend.com → API Keys → Create)",
+        invalidKey: "Go to resend.com/api-keys, delete old key, create new one, update in Render",
+        fromError: `Using "${RESEND_FROM}" — this always works without domain verification`,
+        smtpBlocked: "SMTP ports are blocked on Render — use Resend instead",
       },
     });
   } catch (error: any) {
     log("FATAL", error?.message || String(error));
+    console.error("[test-email-GET] Fatal:", error);
     return NextResponse.json({ success: false, error: error?.message, steps }, { status: 500 });
   }
 }
 
-/* ═══════ POST: send real test email ═══════ */
+/* ═══════════════════════════════════════════════════════════════ */
+/* POST: send a real test email (Admin only)                     */
+/* ═══════════════════════════════════════════════════════════════ */
 export async function POST(request: NextRequest) {
   const steps: { time: string; step: string; result: string }[] = [];
   const log = (step: string, result: string) => {
@@ -129,9 +193,9 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    log("START", "POST /api/test-email");
+    log("START", `POST /api/test-email at ${ts()}`);
 
-    // Auth + Admin
+    // Auth + Admin check
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -152,29 +216,41 @@ export async function POST(request: NextRequest) {
     if (!recipient) {
       return NextResponse.json({ error: "No recipient email", steps }, { status: 400 });
     }
-    log("Recipient", recipient);
+    log("Recipient (TO)", recipient);
 
-    // Transport
-    const transport = detectTransport();
-    log("Transport", transport.toUpperCase());
+    // ─── Transport detection with deep logging ───
+    const rawKey = process.env.RESEND_API_KEY;
+    const trimmedKey = rawKey?.trim();
+    const emailPass = process.env.EMAIL_PASS;
 
-    if (transport === "none") {
+    log("RESEND_API_KEY", rawKey ? `SET (first10="${rawKey.slice(0, 10)}...", len=${rawKey.length}, trimmed=${trimmedKey?.length})` : "❌ NOT SET");
+    log("EMAIL_PASS", emailPass ? `SET (len=${emailPass.length})` : "NOT SET");
+
+    const useResend = !!(trimmedKey && trimmedKey.length > 0);
+    const useSmtp = !useResend && !!(emailPass && emailPass.length > 0);
+
+    log("Method selected", useResend ? "RESEND ✅" : useSmtp ? "SMTP ⚠️" : "NONE ❌");
+
+    if (!useResend && !useSmtp) {
       return NextResponse.json({
         success: false,
         error: "No email transport configured",
         steps,
-        fix: "Add RESEND_API_KEY to Render env vars (see GET /api/test-email for instructions)",
+        fix: "Add RESEND_API_KEY to Render env vars. Get one at resend.com/api-keys",
+        envState: {
+          RESEND_API_KEY: rawKey === undefined ? "UNDEFINED" : rawKey === "" ? "EMPTY_STRING" : `SET(len=${rawKey?.length})`,
+          EMAIL_PASS: emailPass === undefined ? "UNDEFINED" : emailPass === "" ? "EMPTY_STRING" : `SET(len=${emailPass?.length})`,
+        },
       }, { status: 500 });
     }
 
-    // Build email HTML
+    // ─── Build test email HTML ───
     const now = new Date();
     const dateStr = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+    const method = useResend ? "Resend API" : "Gmail SMTP";
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f4f4f4;">
   <div style="max-width:550px;margin:20px auto;background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
     <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;text-align:center;">
@@ -186,7 +262,9 @@ export async function POST(request: NextRequest) {
       <p style="color:#555;">Automated test from LERP Intranet.</p>
       <table style="width:100%;border-collapse:collapse;margin:15px 0;">
         <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;"><strong>Transport</strong></td>
-            <td style="padding:8px 12px;border-bottom:1px solid #eee;">${transport === "resend" ? "Resend API ✅" : "Gmail SMTP (legacy)"}</td></tr>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;">${method} ✅</td></tr>
+        <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;"><strong>From</strong></td>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;">${useResend ? RESEND_FROM : "lerpfeq@gmail.com"}</td></tr>
         <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;"><strong>Date</strong></td>
             <td style="padding:8px 12px;border-bottom:1px solid #eee;">${dateStr}</td></tr>
         <tr><td style="padding:8px 12px;color:#666;"><strong>Node</strong></td>
@@ -205,68 +283,158 @@ export async function POST(request: NextRequest) {
       <p style="margin:0;color:#999;font-size:12px;">LERP — Laboratório de Engenharia de Reações Poliméricas</p>
     </div>
   </div>
-</body>
-</html>`;
+</body></html>`;
 
     const subject = `📧 LERP Email Test — ${dateStr}`;
-    const sendStart = Date.now();
 
-    // ─── RESEND ───
-    if (transport === "resend") {
-      const resendKey = process.env.RESEND_API_KEY!;
-      const fromAddr = process.env.RESEND_FROM_EMAIL || "LERP — FEQ/UNICAMP <onboarding@resend.dev>";
-      log("Resend from", fromAddr);
+    // ═══════════════════════════════════════════
+    // RESEND PATH
+    // ═══════════════════════════════════════════
+    if (useResend) {
+      log("Resend", `Creating client with key "${trimmedKey!.slice(0, 10)}..." (${trimmedKey!.length} chars)`);
+      log("Resend FROM", RESEND_FROM);
+      log("Resend TO", recipient);
+      log("Resend SUBJECT", subject);
 
-      const resend = new Resend(resendKey);
+      const resend = new Resend(trimmedKey!);
 
-      const { data: sendData, error: sendError } = await resend.emails.send({
-        from: fromAddr,
-        to: [recipient],
-        subject,
-        html,
-      });
+      // Step 1: Validate API key by listing domains
+      log("Resend validate", "Calling resend.domains.list() to verify API key...");
+      try {
+        const validateStart = Date.now();
+        const { data: domData, error: domError } = await resend.domains.list();
+        const validateMs = Date.now() - validateStart;
 
-      const sendMs = Date.now() - sendStart;
+        if (domError) {
+          log("Resend validate", `❌ API key ERROR in ${validateMs}ms: ${domError.message}`);
+          log("Resend validate detail", JSON.stringify(domError));
+          return NextResponse.json({
+            success: false,
+            transport: "resend",
+            error: `Resend API key validation failed: ${domError.message}`,
+            steps,
+            fix: "Your RESEND_API_KEY appears invalid. Go to resend.com/api-keys and create a new one.",
+          }, { status: 500 });
+        }
 
-      if (sendError) {
-        log("Send", `❌ Resend error: ${sendError.message}`);
+        const domains = domData?.data?.map((d: any) => `${d.name}(${d.status})`) || [];
+        log("Resend validate", `✅ API key VALID in ${validateMs}ms — domains: [${domains.join(", ")}]`);
+      } catch (valErr: any) {
+        log("Resend validate", `❌ EXCEPTION: ${valErr?.message}`);
+        // Don't return — still try to send (some Resend plans may not have domains.list)
+        log("Resend validate", "Continuing to try send anyway...");
+      }
+
+      // Step 2: Actually send the email
+      log("Resend send", `Calling resend.emails.send() NOW...`);
+      const sendStart = Date.now();
+
+      try {
+        const sendResult = await resend.emails.send({
+          from: RESEND_FROM,
+          to: [recipient],
+          subject,
+          html,
+        });
+
+        const sendMs = Date.now() - sendStart;
+
+        log("Resend send", `API call completed in ${sendMs}ms`);
+        log("Resend raw result", JSON.stringify(sendResult));
+
+        const { data: sendData, error: sendError } = sendResult;
+
+        if (sendError) {
+          log("Resend send ERROR", `message: ${sendError.message}`);
+          log("Resend send ERROR name", (sendError as any).name || "N/A");
+          log("Resend send ERROR statusCode", String((sendError as any).statusCode || "N/A"));
+          log("Resend send ERROR full", JSON.stringify(sendError));
+
+          // Diagnose specific errors
+          let diagnosis = "";
+          const msg = sendError.message.toLowerCase();
+          if (msg.includes("api key")) {
+            diagnosis = "API key is invalid or revoked. Create a new one at resend.com/api-keys";
+          } else if (msg.includes("domain") || msg.includes("not verified") || msg.includes("not allowed")) {
+            diagnosis = `FROM address domain not verified. Current FROM is "${RESEND_FROM}" which should work without verification. If you changed RESEND_FROM_EMAIL, remove it and use default.`;
+          } else if (msg.includes("rate") || msg.includes("limit")) {
+            diagnosis = "Rate limited. Free tier is 2 emails/second, 100/day. Wait and retry.";
+          } else if (msg.includes("validation") || msg.includes("invalid")) {
+            diagnosis = `Validation error. Check TO address "${recipient}" is valid.`;
+          } else {
+            diagnosis = "Unknown error. Check the full error details above.";
+          }
+          log("🔍 Diagnosis", diagnosis);
+
+          return NextResponse.json({
+            success: false,
+            transport: "resend",
+            error: sendError.message,
+            errorDetails: sendError,
+            sendMs,
+            fromUsed: RESEND_FROM,
+            toUsed: recipient,
+            diagnosis,
+            steps,
+          }, { status: 500 });
+        }
+
+        // SUCCESS!
+        log("Resend send", `✅ SUCCESS in ${sendMs}ms`);
+        log("Resend email id", sendData?.id || "N/A");
+        log("Resend full data", JSON.stringify(sendData));
+
+        return NextResponse.json({
+          success: true,
+          transport: "resend",
+          message: `✅ Test email sent to ${recipient} via Resend!`,
+          emailId: sendData?.id,
+          fromUsed: RESEND_FROM,
+          sendMs,
+          steps,
+        });
+
+      } catch (sendErr: any) {
+        const sendMs = Date.now() - sendStart;
+
+        log("Resend send EXCEPTION", `${sendErr?.message}`);
+        log("Resend exception name", sendErr?.name || "N/A");
+        log("Resend exception statusCode", String(sendErr?.statusCode || sendErr?.status || "N/A"));
+        log("Resend exception code", sendErr?.code || "N/A");
+
+        try {
+          log("Resend exception full", JSON.stringify(sendErr, Object.getOwnPropertyNames(sendErr)));
+        } catch {
+          log("Resend exception string", String(sendErr));
+        }
+
         return NextResponse.json({
           success: false,
           transport: "resend",
-          error: sendError.message,
+          error: sendErr?.message || String(sendErr),
+          errorType: sendErr?.name,
           sendMs,
+          fromUsed: RESEND_FROM,
+          toUsed: recipient,
           steps,
-          tip: sendError.message.includes("not verified")
-            ? "You need to verify your domain in Resend, OR use the default sender (onboarding@resend.dev)"
-            : undefined,
         }, { status: 500 });
       }
-
-      log("Send", `✅ Resend OK in ${sendMs}ms — id: ${sendData?.id}`);
-
-      return NextResponse.json({
-        success: true,
-        transport: "resend",
-        message: `✅ Test email sent to ${recipient} via Resend`,
-        emailId: sendData?.id,
-        sendMs,
-        steps,
-      });
     }
 
-    // ─── SMTP FALLBACK ───
+    // ═══════════════════════════════════════════
+    // SMTP FALLBACK PATH
+    // ═══════════════════════════════════════════
     const emailUser = process.env.EMAIL_USER || "lerpfeq@gmail.com";
-    const emailPass = process.env.EMAIL_PASS!;
     const from = `"LERP — FEQ/UNICAMP" <${emailUser}>`;
 
     log("SMTP", `host=smtp.gmail.com, port=587, user=${emailUser}`);
-    log("⚠️ Warning", "SMTP may be blocked by Render firewall — consider switching to Resend");
+    log("⚠️", "SMTP is typically BLOCKED on Render. Consider using Resend instead.");
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
       secure: false,
-      auth: { user: emailUser, pass: emailPass },
+      auth: { user: emailUser, pass: emailPass! },
       connectionTimeout: 20000,
       greetingTimeout: 20000,
       socketTimeout: 20000,
@@ -274,25 +442,27 @@ export async function POST(request: NextRequest) {
     });
 
     try {
+      log("SMTP verify", "Testing connection...");
       await transporter.verify();
       log("SMTP verify", "✅ OK");
     } catch (err: any) {
-      log("SMTP verify", `❌ ${err?.message}`);
+      log("SMTP verify", `❌ FAILED: ${err?.message}`);
       transporter.close();
       return NextResponse.json({
         success: false,
         transport: "smtp",
-        error: `SMTP verify failed: ${err?.message}`,
+        error: `SMTP connection failed: ${err?.message}`,
         steps,
-        fix: "Switch to Resend — SMTP is blocked on Render. Add RESEND_API_KEY env var.",
+        fix: "SMTP ports are blocked on Render. Add RESEND_API_KEY env var instead.",
       }, { status: 500 });
     }
 
+    const sendStart = Date.now();
     const info = await transporter.sendMail({ from, to: recipient, subject, html });
     const sendMs = Date.now() - sendStart;
     transporter.close();
 
-    log("Send", `✅ SMTP OK in ${sendMs}ms — ${info.messageId}`);
+    log("SMTP send", `✅ OK in ${sendMs}ms — ${info.messageId}`);
 
     return NextResponse.json({
       success: true,
@@ -302,8 +472,9 @@ export async function POST(request: NextRequest) {
       sendMs,
       steps,
     });
+
   } catch (error: any) {
-    log("FATAL", error?.message || String(error));
+    log("FATAL", `${error?.message || error}`);
     console.error("[test-email-POST] Fatal:", error);
     return NextResponse.json({
       success: false,
