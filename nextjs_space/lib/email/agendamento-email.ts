@@ -26,25 +26,42 @@ function createTransporter() {
   const user = process.env.EMAIL_USER || 'lerpfeq@gmail.com';
   const pass = process.env.EMAIL_PASS || '';
 
-  console.log(`[Email] createTransporter: user=${user}, pass=${pass ? '***configured***' : '⚠️ EMPTY'}`);
+  console.log('╔══════════════════════════════════════════════════════╗');
+  console.log('║        [Email] createTransporter()                  ║');
+  console.log('╠══════════════════════════════════════════════════════╣');
+  console.log(`║ EMAIL_USER  = "${user}"`);
+  console.log(`║ EMAIL_PASS  = ${pass ? `SET (length=${pass.length}, first3="${pass.slice(0,3)}", last3="${pass.slice(-3)}")` : '⚠️ EMPTY / UNDEFINED'}`);
+  console.log(`║ Has spaces? = ${pass.includes(' ') ? '⚠️ YES — this may cause auth failure!' : '✅ No spaces'}`);
+  console.log(`║ NODE_ENV    = ${process.env.NODE_ENV || '(not set)'}`);
 
   if (!pass) {
-    console.warn('[Email] EMAIL_PASS not configured — emails will be skipped');
+    console.log('║ ❌ EMAIL_PASS not configured — emails will be SKIPPED');
+    console.log('╚══════════════════════════════════════════════════════╝');
     return null;
   }
 
-  return nodemailer.createTransport({
+  const config = {
     host: 'smtp.gmail.com',
     port: 587,
-    secure: false,             // STARTTLS — upgrade after connect
+    secure: false,
     auth: { user, pass },
-    connectionTimeout: 15000,  // 15s to establish connection
-    greetingTimeout: 15000,    // 15s for SMTP greeting
-    socketTimeout: 15000,      // 15s for socket inactivity
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 20000,
     tls: {
-      rejectUnauthorized: false, // accept self-signed certs in cloud envs
+      rejectUnauthorized: false,
     },
-  });
+    debug: true,   // enable SMTP protocol debug output
+    logger: true,  // log SMTP traffic to console
+  };
+
+  console.log(`║ Config: host=${config.host}, port=${config.port}, secure=${config.secure}`);
+  console.log(`║ Timeouts: conn=${config.connectionTimeout}ms, greet=${config.greetingTimeout}ms, sock=${config.socketTimeout}ms`);
+  console.log(`║ TLS: rejectUnauthorized=${config.tls.rejectUnauthorized}`);
+  console.log(`║ Debug: ${config.debug}, Logger: ${config.logger}`);
+  console.log('╚══════════════════════════════════════════════════════╝');
+
+  return nodemailer.createTransport(config);
 }
 
 /* ─────────── Google Calendar Link ─────────── */
@@ -180,20 +197,40 @@ export async function sendAgendamentoEmails(
   responsavelEmails: string[],
   isExterno: boolean
 ): Promise<void> {
-  console.log('[Email] ┌─── sendAgendamentoEmails CALLED ───');
-  console.log('[Email] │ Timestamp:', new Date().toISOString());
-  console.log('[Email] │ Equipment:', data.equipamentoNome);
-  console.log('[Email] │ isExterno:', isExterno);
+  console.log('');
+  console.log('╔══════════════════════════════════════════════════════════╗');
+  console.log('║   📧 sendAgendamentoEmails() CALLED                     ║');
+  console.log('╠══════════════════════════════════════════════════════════╣');
+  console.log(`║ Timestamp : ${new Date().toISOString()}`);
+  console.log(`║ Equipment : ${data.equipamentoNome}`);
+  console.log(`║ isExterno : ${isExterno}`);
+  console.log(`║ Creator   : ${data.criadoPor} <${data.criadoPorEmail}>`);
+  console.log(`║ Target    : ${data.paraQuem} <${data.paraQuemEmail || 'N/A'}>`);
+  console.log(`║ Advisor   : ${data.emailOrientador || 'N/A'}`);
+  console.log(`║ Responsáveis count: ${responsavelEmails.length}`);
+  console.log('╠══════════════════════════════════════════════════════════╣');
 
   const transporter = createTransporter();
 
   if (!transporter) {
-    console.log('[Email] │ ⚠️ Transporter is NULL — emails will be SKIPPED');
-    console.log('[Email] │ This means EMAIL_PASS is not configured!');
-    console.log('[Email] └─── sendAgendamentoEmails END (skipped) ───');
+    console.log('║ ❌ Transporter is NULL — emails will be SKIPPED');
+    console.log('║ This means EMAIL_PASS env var is EMPTY or UNDEFINED');
+    console.log('╚══════════════════════════════════════════════════════════╝');
     return;
   }
-  console.log('[Email] │ ✅ Transporter created successfully');
+  console.log('║ ✅ Transporter created — now verifying SMTP connection...');
+
+  // ─── SMTP Verify step (NEW: explicitly test connection before sending) ───
+  try {
+    const verifyStart = Date.now();
+    await transporter.verify();
+    const verifyMs = Date.now() - verifyStart;
+    console.log(`║ ✅ SMTP VERIFY OK in ${verifyMs}ms — connection is alive`);
+  } catch (verifyErr: any) {
+    console.error(`║ ❌ SMTP VERIFY FAILED: ${verifyErr?.message || verifyErr}`);
+    console.error(`║ ❌ Full error:`, verifyErr);
+    console.error('║ ⚠️ Will still attempt to send — sometimes verify fails but send works');
+  }
 
   // Collect all recipients
   const recipients = new Set<string>();
@@ -254,51 +291,58 @@ export async function sendAgendamentoEmails(
   const from = `"LERP — FEQ/UNICAMP" <${process.env.EMAIL_USER || 'lerpfeq@gmail.com'}>`;
 
   const recipientList = Array.from(recipients);
-  console.log(`[Email] │ FINAL recipient list (${recipientList.length}):`, recipientList);
+  console.log(`║ FINAL recipient list (${recipientList.length}):`, recipientList);
 
   if (recipientList.length === 0) {
-    console.log('[Email] │ ⚠️ NO RECIPIENTS — no emails will be sent!');
-    console.log('[Email] └─── sendAgendamentoEmails END (no recipients) ───');
+    console.log('║ ⚠️ NO RECIPIENTS — no emails will be sent!');
+    console.log('╚══════════════════════════════════════════════════════════╝');
     transporter.close();
     return;
   }
 
-  // Send each email with a per-recipient 10s timeout
-  const results: { email: string; ok: boolean; error?: string; messageId?: string }[] = [];
+  // Send each email individually (sequential — easier to debug)
+  const results: { email: string; ok: boolean; error?: string; messageId?: string; ms?: number }[] = [];
+  const batchStart = Date.now();
 
-  const sendPromises = recipientList.map(async (email) => {
+  for (const email of recipientList) {
+    console.log(`║ ────────────────────────────────────────────`);
+    console.log(`║ 📤 SENDING to: ${email}`);
+    const startMs = Date.now();
     try {
-      console.log(`[Email] │ 📤 Sending to: ${email}...`);
-      const startMs = Date.now();
       const info = await withTimeout(
         transporter.sendMail({ from, to: email, subject, html }),
-        10000,
+        20000,
         `sendMail(${email})`
       );
       const elapsed = Date.now() - startMs;
-      console.log(`[Email] │ ✅ Sent to ${email} in ${elapsed}ms — messageId: ${info.messageId}`);
-      console.log(`[Email] │    SMTP response: ${info.response}`);
-      results.push({ email, ok: true, messageId: info.messageId });
+      console.log(`║ ✅ SENT to ${email} in ${elapsed}ms`);
+      console.log(`║    messageId : ${info.messageId}`);
+      console.log(`║    response  : ${info.response}`);
+      console.log(`║    accepted  : ${JSON.stringify(info.accepted)}`);
+      console.log(`║    rejected  : ${JSON.stringify(info.rejected)}`);
+      results.push({ email, ok: true, messageId: info.messageId, ms: elapsed });
     } catch (err: any) {
+      const elapsed = Date.now() - startMs;
       const errMsg = err?.message || String(err);
-      console.error(`[Email] │ ❌ FAILED to send to ${email}: ${errMsg}`);
-      results.push({ email, ok: false, error: errMsg });
-      // Don't throw — emails are best-effort
+      console.error(`║ ❌ FAILED to send to ${email} after ${elapsed}ms`);
+      console.error(`║    Error: ${errMsg}`);
+      console.error(`║    Code : ${err?.code || 'N/A'}`);
+      console.error(`║    Command: ${err?.command || 'N/A'}`);
+      results.push({ email, ok: false, error: errMsg, ms: elapsed });
     }
-  });
-
-  // Global 15s timeout for the entire batch
-  try {
-    await withTimeout(Promise.all(sendPromises), 15000, 'all emails batch');
-    console.log(`[Email] │ ✅ Batch complete: ${results.filter(r => r.ok).length}/${recipientList.length} sent`);
-  } catch (err: any) {
-    console.error('[Email] │ ⏱️ Batch timed out or failed:', err?.message || err);
-  } finally {
-    // Close transporter to release socket — prevents hanging connections
-    transporter.close();
-    console.log('[Email] │ Transporter closed');
   }
 
-  console.log('[Email] │ Results:', JSON.stringify(results));
-  console.log('[Email] └─── sendAgendamentoEmails END ───');
+  const batchElapsed = Date.now() - batchStart;
+
+  // Close transporter
+  transporter.close();
+
+  const successCount = results.filter(r => r.ok).length;
+  console.log(`║ ────────────────────────────────────────────`);
+  console.log(`║ 📊 BATCH SUMMARY`);
+  console.log(`║    Total: ${recipientList.length} | Sent: ${successCount} | Failed: ${recipientList.length - successCount}`);
+  console.log(`║    Total time: ${batchElapsed}ms`);
+  console.log(`║    Results: ${JSON.stringify(results)}`);
+  console.log('╚══════════════════════════════════════════════════════════╝');
+  console.log('');
 }
