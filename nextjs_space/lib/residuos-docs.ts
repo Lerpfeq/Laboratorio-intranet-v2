@@ -584,6 +584,9 @@ export async function gerarRotuloExcel(
   const departamento = asText(frasco.departamento);
   const responsavel = asText(frasco.responsavel);
 
+  // Número do frasco vai no título (A1), ao lado de "RESÍDUO QUÍMICO"
+  worksheet.getCell("A1").value = `RESÍDUO QUÍMICO - Frasco nº ${numeroDoCampanha}`;
+
   // Escreve nas células-mestre dos intervalos mesclados dos rótulos (A4:P4 ...),
   // preservando o texto do rótulo e anexando o valor correspondente.
   worksheet.getCell("A4").value = `Departamento: ${departamento === "-" ? "" : departamento}`;
@@ -591,7 +594,8 @@ export async function gerarRotuloExcel(
   worksheet.getCell("A6").value = `Responsável pelas informações: ${
     responsavel === "-" ? "" : responsavel
   }`;
-  worksheet.getCell("A7").value = `Resíduo gerado na análise de: Frasco nº ${numeroDoCampanha}`;
+  // Campo "Resíduo gerado na análise de:" deixado em branco conforme solicitado
+  worksheet.getCell("A7").value = `Resíduo gerado na análise de:`;
 
   // Caixas de resposta SIM/NÃO — preenchidas automaticamente a partir da CLASSE
   // do resíduo e da COMPOSIÇÃO do frasco (ver mapeamento no comentário acima):
