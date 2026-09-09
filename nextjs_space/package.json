@@ -10,6 +10,9 @@
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/safe-seed.ts"
   },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "devDependencies": {
     "@next/swc-wasm-nodejs": "13.5.1",
     "@types/bcryptjs": "2.4.6",
@@ -39,7 +42,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.0.0",
     "@aws-sdk/s3-request-presigner": "^3.0.0",
-    "@azure/storage-blob": "12.32.0",
+    "@azure/storage-blob": "^12.33.0",
     "@floating-ui/react": "0.26.0",
     "@headlessui/react": "1.7.18",
     "@hookform/resolvers": "3.9.0",
