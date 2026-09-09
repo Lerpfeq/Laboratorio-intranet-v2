@@ -235,6 +235,7 @@ export async function gerarEtiquetaInterna(residuo: ResiduoDoc): Promise<Buffer>
     width: pageWidth - 20,
     height: 24,
     color: rgb(0.92, 0.92, 0.92),
+    opacity: 0.5,  // Transparência de 50%
   });
 
   page.drawText("CONTAINER #:", {
