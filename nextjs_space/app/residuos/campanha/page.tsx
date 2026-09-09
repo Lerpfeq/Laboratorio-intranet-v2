@@ -230,14 +230,14 @@ export default function CampanhaResiduosPage() {
       downloadBase64(data.zipBase64, data.zipFileName, 'application/zip');
 
       setMessage(
-        `Campaign completed: ${data.totalItens} bottles processed. A ZIP file was downloaded containing the campaign spreadsheet and one Excel label per bottle. Items were removed from the database.`
+        `Campaign completed: ${data.totalItens} bottles processed. A ZIP file was downloaded containing the collection spreadsheet and one Excel label per bottle. Items were removed from the database.`
       );
 
       setSelectedOrder([]);
       setVolumeAtual({});
       await loadResiduos();
     } catch (error: any) {
-      setMessage(error?.message || 'Error processing campaign');
+      setMessage(error?.message || 'Error processing collection');
     } finally {
       setProcessing(false);
     }
