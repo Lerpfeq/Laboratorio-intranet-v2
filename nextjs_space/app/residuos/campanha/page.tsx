@@ -27,6 +27,16 @@ type Residuo = {
   createdAt: string;
 };
 
+type EditForm = {
+  composicao: string;
+  classe: string;
+  estado: string;
+  tipoRecipiente: string;
+  volumeRecipienteLitros: string;
+  departamento: string;
+  responsavel: string;
+};
+
 function downloadBase64(base64: string, filename: string, mimeType: string) {
   const byteCharacters = atob(base64);
   const byteNumbers = new Array(byteCharacters.length);
@@ -61,6 +71,56 @@ export default function CampanhaResiduosPage() {
   const [departamento, setDepartamento] = useState('');
   const [responsavelInformacoes, setResponsavelInformacoes] = useState('');
   const [dataCampanha, setDataCampanha] = useState(new Date().toISOString().slice(0, 10));
+
+  // Edit modal state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const openEdit = (residuo: Residuo) => {
+    setEditingId(residuo.id);
+    setEditForm({
+      composicao: residuo.composicao,
+      classe: residuo.classe,
+      estado: residuo.estado,
+      tipoRecipiente: residuo.tipoRecipiente,
+      volumeRecipienteLitros: String(residuo.volumeRecipienteLitros),
+      departamento: residuo.departamento,
+      responsavel: residuo.responsavel,
+    });
+    setEditError('');
+  };
+
+  const closeEdit = () => {
+    setEditingId(null);
+    setEditForm(null);
+    setEditError('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editForm) return;
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const response = await fetch(`/api/residuos/${editingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editForm,
+          volumeRecipienteLitros: Number(editForm.volumeRecipienteLitros),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Error saving changes');
+      closeEdit();
+      await loadResiduos();
+    } catch (err: any) {
+      setEditError(err?.message || 'Error saving changes');
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -290,6 +350,7 @@ export default function CampanhaResiduosPage() {
             No bottles registered at the moment.
           </div>
         ) : (
+          <>
           <table className="table">
             <thead>
               <tr>
@@ -302,6 +363,7 @@ export default function CampanhaResiduosPage() {
                 <th>Container Type</th>
                 <th>Current Volume (L)</th>
                 <th>Container Volume (L)</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -342,11 +404,150 @@ export default function CampanhaResiduosPage() {
                       />
                     </td>
                     <td>{residuo.volumeRecipienteLitros}</td>
+                    <td>
+                      <button
+                        onClick={() => openEdit(residuo)}
+                        style={{
+                          padding: '0.3rem 0.7rem',
+                          background: '#f39c12',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                        }}
+                      >
+                        ✏️ Edit
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+
+          {/* Edit Modal */}
+          {editingId && editForm && (
+            <div
+              style={{
+                position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+              }}
+              onClick={(e) => { if (e.target === e.currentTarget) closeEdit(); }}
+            >
+              <div style={{
+                background: 'white', borderRadius: '8px', padding: '2rem',
+                width: '600px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+              }}>
+                <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: '#2c3e50' }}>
+                  ✏️ Edit Waste Record
+                </h3>
+
+                <div className="form-group">
+                  <label>Composition *</label>
+                  <textarea
+                    rows={3}
+                    value={editForm.composicao}
+                    onChange={(e) => setEditForm((prev) => prev ? { ...prev, composicao: e.target.value } : prev)}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label>Class *</label>
+                    <select
+                      value={editForm.classe}
+                      onChange={(e) => setEditForm((prev) => prev ? { ...prev, classe: e.target.value } : prev)}
+                    >
+                      <option value="HC">HC - Hydrocarbons</option>
+                      <option value="OH">OH - Organohalogenated</option>
+                      <option value="CN">CN - Nitrogenous Compounds</option>
+                      <option value="CS">CS - Sulfur Compounds</option>
+                      <option value="OF">OF - Organophosphates</option>
+                      <option value="OM">OM - Organometallics</option>
+                      <option value="INORGANICO">Inorganic - Inorganics</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>State *</label>
+                    <select
+                      value={editForm.estado}
+                      onChange={(e) => setEditForm((prev) => prev ? { ...prev, estado: e.target.value } : prev)}
+                    >
+                      <option value="S">Solid (S)</option>
+                      <option value="L">Liquid (L)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label>Container Type</label>
+                    <input
+                      type="text"
+                      value={editForm.tipoRecipiente}
+                      onChange={(e) => setEditForm((prev) => prev ? { ...prev, tipoRecipiente: e.target.value } : prev)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Container Volume (L)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.volumeRecipienteLitros}
+                      onChange={(e) => setEditForm((prev) => prev ? { ...prev, volumeRecipienteLitros: e.target.value } : prev)}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label>Department</label>
+                    <input
+                      type="text"
+                      value={editForm.departamento}
+                      onChange={(e) => setEditForm((prev) => prev ? { ...prev, departamento: e.target.value } : prev)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Responsible</label>
+                    <input
+                      type="text"
+                      value={editForm.responsavel}
+                      onChange={(e) => setEditForm((prev) => prev ? { ...prev, responsavel: e.target.value } : prev)}
+                    />
+                  </div>
+                </div>
+
+                {editError && (
+                  <div className="error-message" style={{ marginBottom: '1rem' }}>{editError}</div>
+                )}
+
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                  <button
+                    onClick={closeEdit}
+                    style={{
+                      padding: '0.6rem 1.2rem', background: '#95a5a6', color: 'white',
+                      border: 'none', borderRadius: '4px', cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveEdit}
+                    disabled={editSaving}
+                    className="button button-primary"
+                  >
+                    {editSaving ? 'Saving...' : 'Save changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          </>
         )}
 
         <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
