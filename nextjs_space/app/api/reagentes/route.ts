@@ -39,6 +39,7 @@ export async function GET(_request: NextRequest) {
         id: true,
         nome: true,
         marca: true,
+        casNumber: true,
         localidade: true,
         status: true,
         ultimaAtualizacao: true,
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
 
     const nome = String(data.nome ?? "").trim();
     const marca = String(data.marca ?? "").trim();
+    const casNumber = String(data.casNumber ?? data.cas ?? data.numeroCas ?? "").trim();
     const fabricante = String(data.fabricante ?? data.fornecedor ?? "").trim();
     const categoria = String(data.categoria ?? "").trim();
     const localizacao = String(data.localizacao ?? data.localidade ?? "").trim();
@@ -100,6 +102,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name, brand, supplier, invoice number and quantity are required" }, { status: 400 });
     }
 
+    if (!casNumber) {
+      return NextResponse.json({ error: "CAS number is required" }, { status: 400 });
+    }
+
     const dataEntrada = data.dataEntrada ? new Date(data.dataEntrada) : new Date();
     const dataValidade = validadeIndeterminada ? null : (data.dataValidade ? new Date(data.dataValidade) : null);
 
@@ -111,6 +117,7 @@ export async function POST(request: NextRequest) {
           data: {
             nome,
             marca,
+            casNumber,
             localidade: localizacao || null,
             status: "ok",
           },
@@ -118,7 +125,7 @@ export async function POST(request: NextRequest) {
       } else {
         reagente = await tx.reagente.update({
           where: { id: reagente.id },
-          data: { status: "ok", ultimaAtualizacao: new Date(), localidade: localizacao || reagente.localidade },
+          data: { status: "ok", ultimaAtualizacao: new Date(), casNumber, localidade: localizacao || reagente.localidade },
         });
       }
 

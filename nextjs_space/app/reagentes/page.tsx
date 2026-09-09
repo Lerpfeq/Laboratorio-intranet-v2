@@ -13,6 +13,7 @@ interface InventoryEntry {
   reagenteId: string;
   nome: string;
   marca: string | null;
+  casNumber?: string | null;
   entradas: {
     id: string;
     codigoInterno: string;
@@ -135,6 +136,7 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
 
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroCodigo, setFiltroCodigo] = useState('');
+  const [filtroCas, setFiltroCas] = useState('');
   const [filtroMarca, setFiltroMarca] = useState('');
   const [filtroLocalizacao, setFiltroLocalizacao] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'all' | 'valid' | 'expired'>('all');
@@ -166,6 +168,7 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
 
       const matchNome = !filtroNome || r.nome.toLowerCase().includes(filtroNome.toLowerCase());
       const matchCodigo = !filtroCodigo || (entrada?.codigoInterno || '').toLowerCase().includes(filtroCodigo.toLowerCase());
+      const matchCas = !filtroCas || (r.casNumber || '').toLowerCase().includes(filtroCas.toLowerCase());
       const matchMarca = !filtroMarca || (r.marca || '').toLowerCase().includes(filtroMarca.toLowerCase());
       const matchLocalizacao = !filtroLocalizacao || location.toLowerCase().includes(filtroLocalizacao.toLowerCase());
       const matchStatus =
@@ -173,9 +176,9 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
         (filtroStatus === 'valid' && status === 'Valid') ||
         (filtroStatus === 'expired' && status === 'Expired');
 
-      return matchNome && matchCodigo && matchMarca && matchLocalizacao && matchStatus;
+      return matchNome && matchCodigo && matchCas && matchMarca && matchLocalizacao && matchStatus;
     });
-  }, [reagentes, filtroNome, filtroCodigo, filtroMarca, filtroLocalizacao, filtroStatus]);
+  }, [reagentes, filtroNome, filtroCodigo, filtroCas, filtroMarca, filtroLocalizacao, filtroStatus]);
 
   return (
     <div>
@@ -195,6 +198,14 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
           placeholder="Filter by internal code... (e.g. LERP-S1234)"
           value={filtroCodigo}
           onChange={(e) => setFiltroCodigo(e.target.value)}
+          className="filter-input"
+        />
+
+        <input
+          type="text"
+          placeholder="Filtrar por número CAS..."
+          value={filtroCas}
+          onChange={(e) => setFiltroCas(e.target.value)}
           className="filter-input"
         />
 
@@ -235,6 +246,7 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
             <tr>
               <th>Name</th>
               <th>Brand</th>
+              <th>Número CAS</th>
               <th>Internal Code</th>
               <th>Category</th>
               <th>Concentration</th>
@@ -252,6 +264,7 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
                 <tr key={r.id}>
                   <td><strong>{r.nome}</strong></td>
                   <td>{r.marca || '-'}</td>
+                  <td>{r.casNumber || '-'}</td>
                   <td><code>{entrada?.codigoInterno || '-'}</code></td>
                   <td>{entrada?.categoria || '-'}</td>
                   <td>{entrada?.concentracao || '-'}</td>
@@ -307,6 +320,7 @@ function EntradaForm() {
   const [formData, setFormData] = useState({
     nome: '',
     marca: '',
+    casNumber: '',
     fabricante: '',
     numeroNotaFiscal: '',
     quantidade: '',
@@ -331,6 +345,7 @@ function EntradaForm() {
     setFormData({
       nome: '',
       marca: '',
+      casNumber: '',
       fabricante: '',
       numeroNotaFiscal: '',
       quantidade: '',
@@ -357,6 +372,11 @@ function EntradaForm() {
 
     if (!formData.marca.trim()) {
       setMessage('Brand is a required field.');
+      return;
+    }
+
+    if (!formData.casNumber.trim()) {
+      setMessage('Número CAS é um campo obrigatório.');
       return;
     }
 
@@ -467,6 +487,17 @@ function EntradaForm() {
           placeholder="Ex: Sigma-Aldrich, Merck, Fisher"
           value={formData.marca}
           onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+          required
+        />
+      </div>
+
+      <div className="form-group">
+        <label>Número CAS *</label>
+        <input
+          type="text"
+          placeholder="Ex: 67-64-1"
+          value={formData.casNumber}
+          onChange={(e) => setFormData({ ...formData, casNumber: e.target.value })}
           required
         />
       </div>

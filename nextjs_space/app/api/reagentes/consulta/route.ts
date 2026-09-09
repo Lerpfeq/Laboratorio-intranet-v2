@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const nome = searchParams.get("nome") || "";
     const marca = searchParams.get("marca") || "";
+    const cas = searchParams.get("cas") || "";
 
     const where: any = {};
 
@@ -26,12 +27,17 @@ export async function GET(request: NextRequest) {
       where.marca = { contains: marca, mode: "insensitive" };
     }
 
+    if (cas) {
+      where.casNumber = { contains: cas, mode: "insensitive" };
+    }
+
     const reagentesBase = await prisma.reagente.findMany({
       where,
       select: {
         id: true,
         nome: true,
         marca: true,
+        casNumber: true,
         localidade: true,
         status: true,
         ultimaAtualizacao: true,
@@ -65,6 +71,7 @@ export async function GET(request: NextRequest) {
         reagenteId: reagente.id,
         nome: reagente.nome,
         marca: reagente.marca,
+        casNumber: reagente.casNumber,
         localidade: reagente.localidade,
         status: reagente.status,
         ultimaAtualizacao: reagente.ultimaAtualizacao,
