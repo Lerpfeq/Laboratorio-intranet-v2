@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
 import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -96,6 +97,7 @@ function getTemplatePath(filename: string): string {
 export function ensureTemplateExists(): void {
   getTemplatePath("Planilha campanha.xlsx");
   getTemplatePath("rotulo-campanha-template.xlsx");
+  getTemplatePath("residuo_quimico.xlsx");
 }
 
 function formatDatePtBR(value: unknown): string {
@@ -511,6 +513,117 @@ export async function gerarPlanilhaCampanha(
   });
 
   return Buffer.from(outputBuffer);
+}
+
+/**
+ * Divide o texto livre de composição em até 5 compostos, extraindo a
+ * porcentagem quando presente no próprio texto (ex.: "Etanol 70%").
+ * Aceita separadores de linha, vírgula, ponto-e-vírgula e a barra "/".
+ */
+function parseComposicao(
+  composicao: string | null | undefined
+): { nome: string; porcentagem: string }[] {
+  if (!composicao) return [];
+
+  const partes = String(composicao)
+    .split(/[\n;\/]+|,(?![0-9])/g) // não quebra em vírgula decimal (ex.: 12,5%)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+
+  const compostos = partes.map((parte) => {
+    const match = parte.match(/(\d+(?:[.,]\d+)?)\s*%/);
+    let porcentagem = "";
+    let nome = parte;
+
+    if (match) {
+      porcentagem = `${match[1].replace(".", ",")}%`;
+      nome = parte.replace(match[0], "").trim();
+      // remove pontuação/conectores residuais no fim do nome
+      nome = nome.replace(/[-:–—]+\s*$/g, "").trim();
+    }
+
+    return { nome, porcentagem };
+  });
+
+  return compostos.slice(0, 5);
+}
+
+/**
+ * Gera o rótulo individual de um frasco de resíduo químico em Excel a partir
+ * do template "residuo_quimico.xlsx" (aba "Rótulo").
+ *
+ * IMPORTANTE — mapeamento das caixas de resposta SIM/NÃO:
+ * o template possui rótulos à esquerda (A:D) com caixa de resposta na coluna E,
+ * e rótulos à direita (F:R) com caixa de resposta mesclada em S:T. Portanto:
+ *   - E10 = HALOGENADOS        | S10 = PRESENÇA DE ENXOFRE
+ *   - E11 = ACETONITRILA       | S11 = GERADOR DE CIANETOS
+ *   - E12 = METAIS PESADOS     | S12 = AMINAS
+ * (Este mapeamento segue a geometria real do arquivo. A especificação textual
+ * original citava S10/S11/S12 para halogenados/acetonitrila/metais, mas essas
+ * são justamente as caixas de ENXOFRE/CIANETOS/AMINAS — o que produziria um
+ * rótulo trocado. Por isso adotamos o mapeamento geometricamente correto.)
+ *
+ * A função carrega o template preservando estilos e mesclagens (ExcelJS) e
+ * escreve apenas nas células de valor, gravando sempre na célula-mestre de cada
+ * intervalo mesclado.
+ */
+export async function gerarRotuloExcel(
+  frasco: ResiduoDoc,
+  numeroDoCampanha: number
+): Promise<Buffer> {
+  const templatePath = getTemplatePath("residuo_quimico.xlsx");
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(templatePath);
+
+  const worksheet = workbook.getWorksheet("Rótulo") || workbook.worksheets[0];
+
+  const nomeLaboratorio =
+    "Laboratório de Engenharia de Reações Poliméricas - LERP / Prof. Dr. Roniérik Pioli Vieira";
+
+  const departamento = asText(frasco.departamento);
+  const responsavel = asText(frasco.responsavel);
+
+  // Escreve nas células-mestre dos intervalos mesclados dos rótulos (A4:P4 ...),
+  // preservando o texto do rótulo e anexando o valor correspondente.
+  worksheet.getCell("A4").value = `Departamento: ${departamento === "-" ? "" : departamento}`;
+  worksheet.getCell("A5").value = `Laboratório: ${nomeLaboratorio}`;
+  worksheet.getCell("A6").value = `Responsável pelas informações: ${
+    responsavel === "-" ? "" : responsavel
+  }`;
+  worksheet.getCell("A7").value = `Resíduo gerado na análise de: Frasco nº ${numeroDoCampanha}`;
+
+  // Caixas de resposta SIM/NÃO (ver mapeamento no comentário acima).
+  const halogenados = asNumber(frasco.halogenadosPercentual) ?? asNumber(frasco.halogenados);
+  const acetonitrila = asNumber(frasco.acetonitrilaPercentual) ?? asNumber(frasco.acetonitrila);
+  const metaisPesados = asNumber(frasco.metaisPesadosPercentual) ?? asNumber(frasco.metaisPesados);
+  const enxofre = Boolean(frasco.presencaEnxofre ?? frasco.enxofre);
+  const cianetos = Boolean(frasco.geradorCianetos ?? frasco.cianeto);
+  const aminas = Boolean(frasco.aminas);
+
+  const simNaoPercentual = (v: number | null) => (v !== null && v > 0 ? "SIM" : "NÃO");
+  const simNaoBool = (v: boolean) => (v ? "SIM" : "NÃO");
+
+  worksheet.getCell("E10").value = simNaoPercentual(halogenados);
+  worksheet.getCell("E11").value = simNaoPercentual(acetonitrila);
+  worksheet.getCell("E12").value = simNaoPercentual(metaisPesados);
+  worksheet.getCell("S10").value = simNaoBool(enxofre);
+  worksheet.getCell("S11").value = simNaoBool(cianetos);
+  worksheet.getCell("S12").value = simNaoBool(aminas);
+
+  // Compostos (linhas 14 a 18): nome em A (A14:N14 ...) e porcentagem em O (O14:T14 ...).
+  const compostos = parseComposicao(frasco.composicao);
+  for (let i = 0; i < 5; i += 1) {
+    const linha = 14 + i;
+    const composto = compostos[i];
+    if (composto) {
+      worksheet.getCell(`A${linha}`).value = composto.nome || "";
+      worksheet.getCell(`O${linha}`).value = composto.porcentagem || "";
+    }
+  }
+
+  const arrayBuffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 export async function gerarRotulosCampanha(residuos: any[]): Promise<Buffer> {

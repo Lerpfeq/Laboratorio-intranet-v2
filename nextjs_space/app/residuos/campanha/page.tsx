@@ -167,19 +167,10 @@ export default function CampanhaResiduosPage() {
         throw new Error(data?.error || 'Failed to process campaign');
       }
 
-      downloadBase64(
-        data.planilhaBase64,
-        data.planilhaFileName,
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      );
-      downloadBase64(
-        data.rotulosBase64,
-        data.rotulosFileName,
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      );
+      downloadBase64(data.zipBase64, data.zipFileName, 'application/zip');
 
       setMessage(
-        `Campaign completed: ${data.totalItens} bottles processed, spreadsheet and labels generated, and items removed from database.`
+        `Campaign completed: ${data.totalItens} bottles processed. A ZIP file was downloaded containing the campaign spreadsheet and one Excel label per bottle. Items were removed from the database.`
       );
 
       setSelectedOrder([]);
@@ -364,7 +355,7 @@ export default function CampanhaResiduosPage() {
             onClick={processarCampanha}
             className="button button-primary"
           >
-            {processing ? 'Processing...' : 'Generate spreadsheet + labels and finalize campaign'}
+            {processing ? 'Processing...' : 'Generate ZIP (spreadsheet + Excel labels) and finalize campaign'}
           </button>
           <p style={{ margin: 0, color: '#7f8c8d', fontSize: '0.95rem' }}>
             The ordinal numbering restarts at 1 for each campaign.

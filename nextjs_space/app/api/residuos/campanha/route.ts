@@ -6,8 +6,9 @@ import { CampanhaPayload } from "@/lib/residuos";
 import {
   ensureTemplateExists,
   gerarPlanilhaCampanha,
-  gerarRotulosCampanha,
+  gerarRotuloExcel,
 } from "@/lib/residuos-docs";
+import JSZip from "jszip";
 
 export const dynamic = "force-dynamic";
 
@@ -66,10 +67,12 @@ export async function POST(request: NextRequest) {
 
     const ids = payload.itens.map((item) => item.id);
 
+    // Acesso universal: qualquer usuário (exceto IC, já bloqueado acima) pode
+    // processar campanha para qualquer frasco cadastrado — sem filtro por
+    // usuarioId, em consonância com a listagem universal de frascos.
     const registros = await prisma.registroResiduo.findMany({
       where: {
         id: { in: ids },
-        ...(auth.user.category === "Admin" ? {} : { usuarioId: auth.user.id }),
       },
       orderBy: { createdAt: "asc" },
     });
@@ -77,8 +80,7 @@ export async function POST(request: NextRequest) {
     if (registros.length !== ids.length) {
       return NextResponse.json(
         {
-          error:
-            "One or more bottles were not found or do not belong to the current user",
+          error: "One or more bottles were not found",
         },
         { status: 404 }
       );
@@ -113,21 +115,34 @@ export async function POST(request: NextRequest) {
       responsavel,
       data,
     });
-    const rotulosBuffer = await gerarRotulosCampanha(residuosComOrdinal as any);
+
+    // Monta um único arquivo ZIP contendo a planilha da campanha e um rótulo
+    // Excel individual (residuo_quimico.xlsx preenchido) para cada frasco.
+    const zip = new JSZip();
+    const timestamp = Date.now();
+
+    zip.file(`planilha-campanha-${timestamp}.xlsx`, planilhaBuffer);
+
+    const rotulosFolder = zip.folder("rotulos");
+    for (const frasco of residuosComOrdinal) {
+      const numero = (frasco as any).numeroOrdinal as number;
+      const rotuloBuffer = await gerarRotuloExcel(frasco as any, numero);
+      (rotulosFolder ?? zip).file(`rotulo_frasco_${numero}.xlsx`, rotuloBuffer);
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
 
     await prisma.registroResiduo.deleteMany({
       where: {
         id: { in: ids },
-        ...(auth.user.category === "Admin" ? {} : { usuarioId: auth.user.id }),
       },
     });
 
     return NextResponse.json({
       success: true,
-      planilhaBase64: planilhaBuffer.toString("base64"),
-      planilhaFileName: `planilha-campanha-${Date.now()}.xlsx`,
-      rotulosBase64: rotulosBuffer.toString("base64"),
-      rotulosFileName: `rotulos-campanha-${Date.now()}.docx`,
+      totalItens: residuosComOrdinal.length,
+      zipBase64: zipBuffer.toString("base64"),
+      zipFileName: `campanha-residuos-${timestamp}.zip`,
     });
   } catch (error: any) {
     console.error("POST /api/residuos/campanha error:", error);
