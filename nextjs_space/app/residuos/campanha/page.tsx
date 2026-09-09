@@ -201,7 +201,7 @@ export default function CampanhaResiduosPage() {
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/residuos">Waste</Link>
             <Link href="/residuos/cadastro">Register</Link>
-            <Link href="/residuos/campanha">Campaign</Link>
+            <Link href="/residuos/campanha">Collection</Link>
           </nav>
           <div className="user-menu">
             <span>{user?.name || user?.email}</span>
@@ -211,7 +211,7 @@ export default function CampanhaResiduosPage() {
       </header>
 
       <main className="container">
-        <h2 className="page-title">Collection Campaign</h2>
+        <h2 className="page-title">Collection</h2>
 
         <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', borderBottom: '2px solid #e0e0e0' }}>
           <Link href="/residuos/cadastro">
@@ -239,7 +239,7 @@ export default function CampanhaResiduosPage() {
                 borderRadius: '4px 4px 0 0',
               }}
             >
-              Campaign
+              Collection
             </button>
           </Link>
         </div>

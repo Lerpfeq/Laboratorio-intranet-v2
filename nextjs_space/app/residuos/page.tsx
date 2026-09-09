@@ -71,7 +71,7 @@ export default function ResiduosPage() {
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/residuos">Waste</Link>
             <Link href="/residuos/cadastro">Register</Link>
-            <Link href="/residuos/campanha">Campaign</Link>
+            <Link href="/residuos/campanha">Collection</Link>
           </nav>
           <div className="user-menu">
             <span>{user?.name || user?.email}</span>
@@ -116,7 +116,7 @@ export default function ResiduosPage() {
           <div className="card card-purple" style={{ cursor: 'default' }}>
             <div className="card-header">
               <span className="card-icon">📋</span>
-              <span>Collection Campaign</span>
+              <span>Collection</span>
             </div>
             <p style={{ margin: 0, color: '#555' }}>
               Select bottles, enter current volume and generate spreadsheet + campaign labels.

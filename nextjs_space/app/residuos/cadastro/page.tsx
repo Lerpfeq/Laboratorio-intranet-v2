@@ -165,7 +165,7 @@ export default function CadastroResiduoPage() {
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/residuos">Waste</Link>
             <Link href="/residuos/cadastro">Register</Link>
-            <Link href="/residuos/campanha">Campaign</Link>
+            <Link href="/residuos/campanha">Collection</Link>
           </nav>
           <div className="user-menu">
             <span>{user?.name || user?.email}</span>
@@ -203,7 +203,7 @@ export default function CadastroResiduoPage() {
                 borderRadius: '4px 4px 0 0',
               }}
             >
-              Campaign
+              Collection
             </button>
           </Link>
         </div>
@@ -227,13 +227,13 @@ export default function CadastroResiduoPage() {
                 onChange={(event) => setForm((prev) => ({ ...prev, classe: event.target.value }))}
                 required
               >
-                <option value="HC">HC - Hidrocarbonetos</option>
-                <option value="OH">OH - Organoalogenados</option>
-                <option value="CN">CN - Compostos Nitrogenados</option>
-                <option value="CS">CS - Compostos Sulfurados</option>
-                <option value="OF">OF - Organofosforados</option>
-                <option value="OM">OM - Organometálicos</option>
-                <option value="INORGANICO">Inorganic - Inorgânicos</option>
+                <option value="HC">HC - Hydrocarbons</option>
+                <option value="OH">OH - Organohalogenated</option>
+                <option value="CN">CN - Nitrogenous Compounds</option>
+                <option value="CS">CS - Sulfur Compounds</option>
+                <option value="OF">OF - Organophosphates</option>
+                <option value="OM">OM - Organometallics</option>
+                <option value="INORGANICO">Inorganic - Inorganics</option>
               </select>
             </div>
 
@@ -248,6 +248,13 @@ export default function CadastroResiduoPage() {
                 <option value="L">Liquid (L)</option>
               </select>
             </div>
+          </div>
+
+          <div style={{ marginTop: '0.5rem', marginBottom: '0.5rem', padding: '0.6rem 0.8rem', backgroundColor: '#fef9f0', border: '1px solid #f0a500', borderRadius: '6px', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1rem' }}>⚠️</span>
+            <span style={{ fontSize: '0.85rem', color: '#7d4e00' }}>
+              <strong>Note (Gilson):</strong> Always select <strong>OH – Organohalogenated</strong> (organochlorine) as the waste class, regardless of the actual composition.
+            </span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
