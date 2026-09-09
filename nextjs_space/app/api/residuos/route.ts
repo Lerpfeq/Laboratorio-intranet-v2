@@ -70,13 +70,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const isAdmin = auth.user.category === "Admin";
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get("q")?.trim();
 
+    // Acesso universal aos frascos: usuários "IC" já foram bloqueados em
+    // getAuthedUser(). Todos os demais usuários com acesso ao bloco de resíduos
+    // visualizam TODOS os frascos cadastrados (sem filtro por usuarioId).
     const residuos = await prisma.registroResiduo.findMany({
       where: {
-        ...(isAdmin ? {} : { usuarioId: auth.user.id }),
         ...(q
           ? {
               OR: [
