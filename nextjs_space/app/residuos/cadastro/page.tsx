@@ -227,13 +227,13 @@ export default function CadastroResiduoPage() {
                 onChange={(event) => setForm((prev) => ({ ...prev, classe: event.target.value }))}
                 required
               >
-                <option value="HC">HC</option>
-                <option value="OH">OH</option>
-                <option value="CN">CN</option>
-                <option value="CS">CS</option>
-                <option value="OF">OF</option>
-                <option value="OM">OM</option>
-                <option value="INORGANICO">Inorganic</option>
+                <option value="HC">HC - Hidrocarbonetos</option>
+                <option value="OH">OH - Organoalogenados</option>
+                <option value="CN">CN - Compostos Nitrogenados</option>
+                <option value="CS">CS - Compostos Sulfurados</option>
+                <option value="OF">OF - Organofosforados</option>
+                <option value="OM">OM - Organometálicos</option>
+                <option value="INORGANICO">Inorganic - Inorgânicos</option>
               </select>
             </div>
 

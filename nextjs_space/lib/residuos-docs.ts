@@ -593,23 +593,33 @@ export async function gerarRotuloExcel(
   }`;
   worksheet.getCell("A7").value = `Resíduo gerado na análise de: Frasco nº ${numeroDoCampanha}`;
 
-  // Caixas de resposta SIM/NÃO (ver mapeamento no comentário acima).
-  const halogenados = asNumber(frasco.halogenadosPercentual) ?? asNumber(frasco.halogenados);
-  const acetonitrila = asNumber(frasco.acetonitrilaPercentual) ?? asNumber(frasco.acetonitrila);
-  const metaisPesados = asNumber(frasco.metaisPesadosPercentual) ?? asNumber(frasco.metaisPesados);
-  const enxofre = Boolean(frasco.presencaEnxofre ?? frasco.enxofre);
-  const cianetos = Boolean(frasco.geradorCianetos ?? frasco.cianeto);
-  const aminas = Boolean(frasco.aminas);
+  // Caixas de resposta SIM/NÃO — preenchidas automaticamente a partir da CLASSE
+  // do resíduo e da COMPOSIÇÃO do frasco (ver mapeamento no comentário acima):
+  //   - HALOGENADOS (E10)     → SIM se classe === "OH"
+  //   - ENXOFRE/SULFURADAS (S10) → SIM se classe === "CS"
+  //   - ACETONITRILA (E11)    → SIM se a composição contiver "acetonitrila"
+  //   - CIANETOS (S11)        → SIM se classe === "CN"
+  //   - METAIS PESADOS (E12)  → SIM se classe === "OM" ou "Inorganic" (INORGANICO)
+  //   - AMINAS (S12)          → SIM se a composição contiver "amina"
+  const classe = String(frasco.classe ?? "").trim().toUpperCase();
+  const composicaoTexto = String(frasco.composicao ?? "").toLowerCase();
 
-  const simNaoPercentual = (v: number | null) => (v !== null && v > 0 ? "SIM" : "NÃO");
-  const simNaoBool = (v: boolean) => (v ? "SIM" : "NÃO");
+  const halogenados = classe === "OH";
+  const enxofre = classe === "CS";
+  const acetonitrila = composicaoTexto.includes("acetonitrila");
+  const cianetos = classe === "CN";
+  const metaisPesados =
+    classe === "OM" || classe === "INORGANIC" || classe === "INORGANICO";
+  const aminas = composicaoTexto.includes("amina");
 
-  worksheet.getCell("E10").value = simNaoPercentual(halogenados);
-  worksheet.getCell("E11").value = simNaoPercentual(acetonitrila);
-  worksheet.getCell("E12").value = simNaoPercentual(metaisPesados);
-  worksheet.getCell("S10").value = simNaoBool(enxofre);
-  worksheet.getCell("S11").value = simNaoBool(cianetos);
-  worksheet.getCell("S12").value = simNaoBool(aminas);
+  const simNao = (v: boolean) => (v ? "SIM" : "NÃO");
+
+  worksheet.getCell("E10").value = simNao(halogenados);
+  worksheet.getCell("E11").value = simNao(acetonitrila);
+  worksheet.getCell("E12").value = simNao(metaisPesados);
+  worksheet.getCell("S10").value = simNao(enxofre);
+  worksheet.getCell("S11").value = simNao(cianetos);
+  worksheet.getCell("S12").value = simNao(aminas);
 
   // Compostos (linhas 14 a 18): nome em A (A14:N14 ...) e porcentagem em O (O14:T14 ...).
   const compostos = parseComposicao(frasco.composicao);
