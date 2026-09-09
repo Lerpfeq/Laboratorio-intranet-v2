@@ -71,7 +71,7 @@ export default function EditReagentePage() {
     e.preventDefault();
 
     if (!nome || !marca || !casNumber || !fabricante || !quantidade) {
-      alert('Please fill in all required fields (Name, Brand, Número CAS, Supplier, Quantity)');
+      alert('Please fill in all required fields (Name, Brand, CAS Number, Supplier, Quantity)');
       return;
     }
 
@@ -151,12 +151,12 @@ export default function EditReagentePage() {
           </div>
 
           <div className="form-group">
-            <label>Número CAS *</label>
+            <label>CAS Number *</label>
             <input
               type="text"
               value={casNumber}
               onChange={(e) => setCasNumber(e.target.value)}
-              placeholder="Ex: 67-64-1"
+              placeholder="e.g., 67-64-1"
               required
             />
           </div>
