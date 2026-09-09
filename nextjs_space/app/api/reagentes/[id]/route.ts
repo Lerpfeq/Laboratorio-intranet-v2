@@ -32,6 +32,7 @@ export async function GET(
           select: {
             nome: true,
             marca: true,
+            casNumber: true,
           },
         },
       },
@@ -47,6 +48,7 @@ export async function GET(
         id: reagente.id,
         codigo: reagente.codigoInterno,
         nome: reagente.reagente.nome,
+        casNumber: reagente.reagente.casNumber || '',
         marca: reagente.marca || reagente.reagente.marca || '',
         fabricante: reagente.fornecedor || '',
         numeroNotaFiscal: reagente.notaFiscal || '',
@@ -104,10 +106,18 @@ export async function PUT(
     const nome = String(data.nome ?? '').trim();
     const marca = String(data.marca ?? '').trim();
     const fabricante = String(data.fabricante ?? '').trim();
+    const casNumber = String(data.casNumber ?? data.cas ?? data.numeroCas ?? '').trim();
 
     if (!nome || !fabricante) {
       return NextResponse.json(
         { error: 'Name and supplier are required' },
+        { status: 400 }
+      );
+    }
+
+    if (!casNumber) {
+      return NextResponse.json(
+        { error: 'CAS number is required' },
         { status: 400 }
       );
     }
@@ -128,6 +138,7 @@ export async function PUT(
         data: {
           nome,
           marca: marca || reagenteExistente.marca || fabricante,
+          casNumber,
           localidade:
             typeof data.localizacao === 'string'
               ? data.localizacao || null

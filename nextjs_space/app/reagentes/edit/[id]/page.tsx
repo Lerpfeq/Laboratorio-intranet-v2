@@ -15,6 +15,7 @@ export default function EditReagentePage() {
 
   const [nome, setNome] = useState('');
   const [marca, setMarca] = useState('');
+  const [casNumber, setCasNumber] = useState('');
   const [fabricante, setFabricante] = useState('');
   const [quantidade, setQuantidade] = useState('');
   const [quantidadeAtual, setQuantidadeAtual] = useState('');
@@ -37,6 +38,7 @@ export default function EditReagentePage() {
           const r = data.reagente;
           setNome(r.nome || '');
           setMarca(r.marca || '');
+          setCasNumber(r.casNumber || '');
           setFabricante(r.fabricante || '');
           setQuantidade(r.quantidade?.toString() || '');
           setQuantidadeAtual(r.quantidadeAtual?.toString() || '');
@@ -68,8 +70,8 @@ export default function EditReagentePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!nome || !marca || !fabricante || !quantidade) {
-      alert('Please fill in all required fields (Name, Brand, Supplier, Quantity)');
+    if (!nome || !marca || !casNumber || !fabricante || !quantidade) {
+      alert('Please fill in all required fields (Name, Brand, Número CAS, Supplier, Quantity)');
       return;
     }
 
@@ -82,6 +84,7 @@ export default function EditReagentePage() {
         body: JSON.stringify({
           nome,
           marca,
+          casNumber,
           fabricante,
           numeroNotaFiscal,
           quantidade: Number.parseFloat(quantidade),
@@ -143,6 +146,17 @@ export default function EditReagentePage() {
               value={marca}
               onChange={(e) => setMarca(e.target.value)}
               placeholder="Ex: Sigma-Aldrich, Merck, Fisher"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Número CAS *</label>
+            <input
+              type="text"
+              value={casNumber}
+              onChange={(e) => setCasNumber(e.target.value)}
+              placeholder="Ex: 67-64-1"
               required
             />
           </div>

@@ -154,6 +154,7 @@ model Reagente {
   id                String   @id @default(cuid())
   nome              String
   marca             String?
+  casNumber         String   @default("") @map("cas_number")
   volume            String?
   localidade        String?
   status            String   @default("ok")
@@ -167,6 +168,7 @@ model Reagente {
 
   @@index([nome])
   @@index([marca])
+  @@index([casNumber])
   @@index([status])
 }
 
