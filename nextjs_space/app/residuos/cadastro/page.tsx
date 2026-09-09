@@ -254,7 +254,7 @@ export default function CadastroResiduoPage() {
             <span style={{ fontSize: '1rem' }}>⚠️</span>
             <span style={{ fontSize: '0.85rem', color: '#7d4e00' }}>
               <strong>Note (Gilson):</strong> Always select <strong>OH – Organohalogenated</strong> (organochlorine) as the waste class, regardless of the actual composition.
-              If your waste contains <strong> controlled chemicals<strong>, as a standard practice, you must add an observation indicating that it contains 3% of that controlled chemical,<strong>e.g.: "Chloroform (3%)"</strong> .
+              If your waste contains <strong>controlled chemicals</strong>, as a standard practice, you must add an observation indicating that it contains 3% of that controlled chemical,<strong>e.g.: "Chloroform (3%)"</strong> .
               If your waste contains <strong>inorganic compounds</strong>, as a standard practice, you must add an observation indicating that it contains traces of that inorganic compound, <strong>e.g.: "Traces of silver nanoparticles"</strong>.
             </span>
           </div>
