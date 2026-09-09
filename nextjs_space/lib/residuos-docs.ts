@@ -587,6 +587,14 @@ export async function gerarRotuloExcel(
   // Número do frasco vai no título (A1), ao lado de "RESÍDUO QUÍMICO"
   worksheet.getCell("A1").value = `RESÍDUO QUÍMICO - Frasco nº ${numeroDoCampanha}`;
 
+  // Data de geração da coleta no campo "Data ou período" (Q4)
+  const dataColeta = new Date().toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  worksheet.getCell("Q4").value = `Data ou período: ${dataColeta}`;
+
   // Escreve nas células-mestre dos intervalos mesclados dos rótulos (A4:P4 ...),
   // preservando o texto do rótulo e anexando o valor correspondente.
   worksheet.getCell("A4").value = `Departamento: ${departamento === "-" ? "" : departamento}`;
