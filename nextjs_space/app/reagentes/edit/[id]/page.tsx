@@ -156,7 +156,7 @@ export default function EditReagentePage() {
               type="text"
               value={casNumber}
               onChange={(e) => setCasNumber(e.target.value)}
-              placeholder="Ex: 67-64-1"
+              placeholder="e.g., 67-64-1"
               required
             />
           </div>

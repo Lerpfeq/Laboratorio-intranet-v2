@@ -203,7 +203,7 @@ function ConsultaReagentes({ userCategory }: { userCategory?: string }) {
 
         <input
           type="text"
-          placeholder="Buscar por CAS number..."
+          placeholder="Search by CAS number..."
           value={filtroCas}
           onChange={(e) => setFiltroCas(e.target.value)}
           className="filter-input"
@@ -376,7 +376,7 @@ function EntradaForm() {
     }
 
     if (!formData.casNumber.trim()) {
-      setMessage('CAS number é um campo obrigatório.');
+      setMessage('CAS number is required.');
       return;
     }
 
@@ -495,7 +495,7 @@ function EntradaForm() {
         <label>CAS number *</label>
         <input
           type="text"
-          placeholder="Ex: 67-64-1"
+          placeholder="e.g., 67-64-1"
           value={formData.casNumber}
           onChange={(e) => setFormData({ ...formData, casNumber: e.target.value })}
           required
