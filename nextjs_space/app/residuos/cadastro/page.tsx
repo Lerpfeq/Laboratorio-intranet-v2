@@ -253,10 +253,10 @@ export default function CadastroResiduoPage() {
           <div style={{ marginTop: '0.5rem', marginBottom: '0.5rem', padding: '0.6rem 0.8rem', backgroundColor: '#fef9f0', border: '1px solid #f0a500', borderRadius: '6px', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
             <span style={{ fontSize: '1rem' }}>⚠️</span>
             <span style={{ fontSize: '0.85rem', color: '#7d4e00' }}>
-              <strong>Note (Gilson):</strong> Always select <strong>OH – Organohalogenated</strong> (organochlorine) as the waste class, regardless of the actual composition.
-              All information needs to be in <strong>portuguese</strong>.
-              If your waste contains <strong>controlled chemicals</strong>, as a standard practice, you must add an observation indicating that it contains 3% of that controlled chemical,<strong>e.g.: "Clorofórmio (3%)"</strong> .
-              If your waste contains <strong>inorganic compounds</strong>, as a standard practice, you must add an observation indicating that it contains traces of that inorganic compound, <strong>e.g.: "Traços de nanoparticulas de prata"</strong>.
+              <strong>Note (Gilson):</strong> Always select <strong>OH – Organohalogenated</strong> (organochlorine) as the waste class, regardless of the actual composition.<br/>
+              All information needs to be in <strong>english</strong>. Separating the chemicals with commas <strong>","</strong>.<br/>
+              If your waste contains <strong>controlled chemicals</strong>, as a standard practice, you must add an observation indicating that it contains 3% of that controlled chemical,<strong>e.g.: "Chloroform 3%"</strong> .<br/>
+              If your waste contains <strong>inorganic compounds</strong>, as a standard practice, you must add an observation indicating that it contains traces of that inorganic compound, <strong>e.g.: "Traces of silver nanoparticles"</strong>. 
             </span>
           </div>
 
@@ -267,7 +267,7 @@ export default function CadastroResiduoPage() {
                 type="text"
                 value={form.tipoRecipiente}
                 onChange={(event) => setForm((prev) => ({ ...prev, tipoRecipiente: event.target.value }))}
-                placeholder="E.g.: Frasco de vidro"
+                placeholder="E.g.: Glass bottle"
                 required
               />
             </div>
