@@ -565,7 +565,7 @@ function EntradaForm() {
           required
         />
         <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-          You can register up to 10 bottles at once
+          You can register up to 3 bottles at once
         </small>
       </div>
 
