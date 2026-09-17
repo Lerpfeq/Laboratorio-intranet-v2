@@ -550,13 +550,13 @@ function EntradaForm() {
         <input
           type="number"
           min="1"
-          max="10"
-          placeholder="Ex: 3 (max: 10)"
+          max="3"
+          placeholder="Ex: 2 (max: 3)"
           value={formData.quantidadeFrascos}
           onChange={(e) => {
             const val = parseInt(e.target.value || '1', 10);
-            if (val > 10) {
-              setMessage('Maximum 10 bottles per entry');
+            if (val > 3) {
+              setMessage('Maximum 3 bottles per entry');
               setFormData({ ...formData, quantidadeFrascos: 10 });
             } else {
               setFormData({ ...formData, quantidadeFrascos: val });
