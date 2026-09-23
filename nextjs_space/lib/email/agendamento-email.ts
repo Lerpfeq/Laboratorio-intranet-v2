@@ -444,7 +444,7 @@ export async function sendAgendamentoEmails(
   // ── FROM address ──
   // HARDCODED to onboarding@resend.dev — Resend's free test sender that works without domain verification
   // To use a custom domain: verify it in Resend dashboard, then set RESEND_FROM_EMAIL env var
-  const RESEND_FROM = process.env.RESEND_FROM_EMAIL || 'LERP <onboarding@resend.dev>';
+  const RESEND_FROM = process.env.RESEND_FROM_EMAIL || 'LERP <lerpfeq@gmail.com>';
   console.log(`║ FROM (Resend): "${RESEND_FROM}"`);
   const SMTP_FROM = `"LERP — FEQ/UNICAMP" <${process.env.EMAIL_USER || 'lerpfeq@gmail.com'}>`;
 
