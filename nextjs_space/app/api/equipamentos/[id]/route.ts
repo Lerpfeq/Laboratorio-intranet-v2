@@ -62,14 +62,26 @@ export async function PUT(
       }
     }
 
-    const { nome, descricao, sopLink } = await request.json();
+    const { nome, descricao, sopLink, equipamentosAssociados } = await request.json();
+
+    const data: any = {
+      nome: nome?.trim(),
+      descricao: descricao?.trim() || null,
+      sopLink: sopLink?.trim() || null,
+    };
+
+    // Only admins can manage equipment associations
+    if (isAdmin && Array.isArray(equipamentosAssociados)) {
+      data.equipamentosAssociados = {
+        set: equipamentosAssociados.map((assocId: string) => ({ id: assocId })),
+      };
+    }
 
     const equipment = await prisma.equipamento.update({
       where: { id },
-      data: {
-        nome: nome?.trim(),
-        descricao: descricao?.trim() || null,
-        sopLink: sopLink?.trim() || null,
+      data,
+      include: {
+        equipamentosAssociados: { select: { id: true, nome: true } },
       },
     });
 

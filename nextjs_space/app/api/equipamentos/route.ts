@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
               user: { select: { id: true, name: true, email: true } },
             },
           },
+          equipamentosAssociados: { select: { id: true, nome: true } },
         },
         orderBy: { nome: 'asc' },
       });
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
               user: { select: { id: true, name: true, email: true } },
             },
           },
+          equipamentosAssociados: { select: { id: true, nome: true } },
           _count: { select: { agendamentos: true } },
         },
         orderBy: { nome: 'asc' },
@@ -65,6 +67,7 @@ export async function GET(request: NextRequest) {
               user: { select: { id: true, name: true, email: true } },
             },
           },
+          equipamentosAssociados: { select: { id: true, nome: true } },
         },
         orderBy: { nome: 'asc' },
       });

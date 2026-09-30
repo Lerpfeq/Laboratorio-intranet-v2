@@ -34,6 +34,15 @@ interface Equipamento {
   descricao: string | null;
   sopLink: string | null;
   autorizacoes: any[];
+  equipamentosAssociados?: { id: string; nome: string }[];
+}
+
+interface ConflitoPotencial {
+  equipamentoId: string;
+  equipamentoNome: string;
+  agendadoPor: string;
+  inicio: string;
+  fim: string;
 }
 
 interface AgendamentoEvent {
@@ -65,6 +74,8 @@ export default function AgendamentosPage() {
   const [showDetailModal, setShowDetailModal] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [conflitosAssociados, setConflitosAssociados] = useState<ConflitoPotencial[]>([]);
+  const [checkingConflicts, setCheckingConflicts] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -134,6 +145,42 @@ export default function AgendamentosPage() {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 4000);
   };
+
+  // Check for associated equipment conflicts whenever equipment or time changes in the modal
+  const checkConflicts = useCallback(async (equipId: string, inicio: string, fim: string) => {
+    if (!equipId || !inicio || !fim) {
+      setConflitosAssociados([]);
+      return;
+    }
+    const inicioDate = new Date(inicio);
+    const fimDate = new Date(fim);
+    if (isNaN(inicioDate.getTime()) || isNaN(fimDate.getTime()) || fimDate <= inicioDate) {
+      setConflitosAssociados([]);
+      return;
+    }
+    setCheckingConflicts(true);
+    try {
+      const url = `/api/agendamentos/conflitos?equipamentoId=${encodeURIComponent(equipId)}&inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setConflitosAssociados(data.conflitos || []);
+      }
+    } catch { /* silent */ }
+    setCheckingConflicts(false);
+  }, []);
+
+  // Re-check conflicts whenever the booking form values change (debounced via useEffect)
+  useEffect(() => {
+    if (!showModal) {
+      setConflitosAssociados([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      checkConflicts(formData.equipamentoId, formData.inicio, formData.fim);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [showModal, formData.equipamentoId, formData.inicio, formData.fim, checkConflicts]);
 
   // Map equipment IDs to colors
   const equipColorMap = useMemo(() => {
@@ -512,6 +559,33 @@ export default function AgendamentosPage() {
                 <label>Notes</label>
                 <textarea value={formData.observacoes} onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })} rows={3} placeholder="Additional information..." />
               </div>
+
+              {/* Associated equipment conflict warning */}
+              {checkingConflicts && (
+                <div style={{ padding: '8px 12px', background: '#f5f5f5', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.85rem', color: '#666' }}>
+                  🔍 Verificando disponibilidade dos equipamentos associados...
+                </div>
+              )}
+              {!checkingConflicts && conflitosAssociados.length > 0 && (
+                <div style={{
+                  background: '#fff3cd', border: '1px solid #ffc107',
+                  borderRadius: '6px', padding: '12px 16px', marginBottom: '1rem',
+                }}>
+                  <div style={{ fontWeight: 600, color: '#856404', marginBottom: '8px' }}>
+                    ⚠️ Aviso: Equipamento(s) associado(s) já agendado(s)
+                  </div>
+                  {conflitosAssociados.map((c, i) => (
+                    <div key={i} style={{ fontSize: '0.875rem', color: '#664d03', marginBottom: '4px' }}>
+                      • <strong>{c.equipamentoNome}</strong> está agendado por <strong>{c.agendadoPor}</strong>{' '}
+                      de {new Date(c.inicio).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}{' '}
+                      até {new Date(c.fim).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}
+                    </div>
+                  ))}
+                  <div style={{ fontSize: '0.8rem', color: '#856404', marginTop: '8px', fontStyle: 'italic' }}>
+                    Você pode continuar o agendamento, mas os equipamentos são interdependentes.
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button className="button button-secondary" onClick={() => setShowModal(false)}>Cancel</button>

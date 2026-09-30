@@ -21,12 +21,18 @@ interface Autorizacao {
   user: { id: string; name: string | null; email: string | null };
 }
 
+interface EquipamentoAssociado {
+  id: string;
+  nome: string;
+}
+
 interface Equipamento {
   id: string;
   nome: string;
   descricao: string | null;
   sopLink: string | null;
   autorizacoes: Autorizacao[];
+  equipamentosAssociados?: EquipamentoAssociado[];
   _count?: { agendamentos: number };
 }
 
@@ -41,6 +47,8 @@ export default function SettingsPage() {
   const [showEditModal, setShowEditModal] = useState<Equipamento | null>(null);
   const [showAuthModal, setShowAuthModal] = useState<Equipamento | null>(null);
   const [formData, setFormData] = useState({ nome: '', descricao: '', sopLink: '' });
+  // IDs of equipment associated with the one being edited (admin only)
+  const [selectedAssociados, setSelectedAssociados] = useState<string[]>([]);
   const [authForm, setAuthForm] = useState({ userId: '', tipo: 'TREINADO' as 'RESPONSAVEL' | 'TREINADO' });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -120,10 +128,13 @@ export default function SettingsPage() {
     if (!showEditModal) return;
     setSaving(true);
     try {
+      const body = isAdmin
+        ? { ...formData, equipamentosAssociados: selectedAssociados }
+        : formData;
       const res = await fetch(`/api/equipamentos/${showEditModal.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         showMsg('success', 'Equipment updated!');
@@ -344,6 +355,7 @@ export default function SettingsPage() {
                               style={{ background: '#f39c12', color: 'white', padding: '6px 12px', fontSize: '0.8rem' }}
                               onClick={() => {
                                 setFormData({ nome: eq.nome, descricao: eq.descricao || '', sopLink: eq.sopLink || '' });
+                                setSelectedAssociados((eq.equipamentosAssociados || []).map((a) => a.id));
                                 setShowEditModal(eq);
                               }}
                             >
@@ -401,24 +413,67 @@ export default function SettingsPage() {
         {/* Edit Modal */}
         {showEditModal && (
           <div className="modal" onClick={() => setShowEditModal(null)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '550px' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Edit Equipment</h3>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+              <h3 style={{ marginBottom: '1.5rem' }}>Editar Equipamento</h3>
               <div className="form-group">
-                <label>Name *</label>
+                <label>Nome *</label>
                 <input value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} />
               </div>
               <div className="form-group">
-                <label>Description</label>
+                <label>Descrição</label>
                 <textarea value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} rows={3} />
               </div>
               <div className="form-group">
-                <label>SOP Link</label>
+                <label>Link SOP</label>
                 <input value={formData.sopLink} onChange={(e) => setFormData({ ...formData, sopLink: e.target.value })} />
               </div>
+
+              {/* Associated equipment — admin only */}
+              {isAdmin && (
+                <div className="form-group">
+                  <label style={{ fontWeight: 600 }}>
+                    🔗 Equipamentos Associados
+                    <span style={{ fontWeight: 400, color: '#666', fontSize: '0.85rem', display: 'block', marginTop: '2px' }}>
+                      Quando este equipamento for agendado, o sistema avisará se algum associado já estiver ocupado.
+                    </span>
+                  </label>
+                  <div style={{
+                    border: '1px solid #ddd', borderRadius: '6px', padding: '10px',
+                    maxHeight: '180px', overflowY: 'auto', marginTop: '6px',
+                  }}>
+                    {equipamentos.filter((eq) => eq.id !== showEditModal.id).length === 0 ? (
+                      <p style={{ color: '#999', margin: 0, fontSize: '0.9rem' }}>Nenhum outro equipamento cadastrado.</p>
+                    ) : (
+                      equipamentos
+                        .filter((eq) => eq.id !== showEditModal.id)
+                        .map((eq) => (
+                          <label key={eq.id} style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '6px 4px', cursor: 'pointer', borderRadius: '4px',
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedAssociados.includes(eq.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedAssociados((prev) => [...prev, eq.id]);
+                                } else {
+                                  setSelectedAssociados((prev) => prev.filter((id) => id !== eq.id));
+                                }
+                              }}
+                            />
+                            <span>{eq.nome}</span>
+                          </label>
+                        ))
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button className="button button-secondary" onClick={() => setShowEditModal(null)}>Cancel</button>
+                <button className="button button-secondary" onClick={() => setShowEditModal(null)}>Cancelar</button>
                 <button className="button button-primary" onClick={handleUpdateEquipamento} disabled={saving}>
-                  {saving ? 'Saving...' : 'Save'}
+                  {saving ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </div>

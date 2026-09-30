@@ -102,6 +102,10 @@ model Equipamento {
   autorizacoes AutorizacaoEquipamento[]
   agendamentos Agendamento[]
 
+  // Self-relation: equipment physically linked to this one (e.g. chiller, gas supply)
+  equipamentosAssociados Equipamento[] @relation("EquipamentosAssociados")
+  associadoPor           Equipamento[] @relation("EquipamentosAssociados")
+
   @@map("equipamentos")
 }
 
