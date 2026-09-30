@@ -340,11 +340,17 @@ export async function sendAgendamentoEmails(
 
   // ── Determine TO and CC ──
   // TO  : the person who was booked (internal email or external email)
-  // CC  : advisor email (only for external users)
+  // CC  : for external bookings — advisor email + the creator (person who made the booking)
   const toEmail = data.paraQuemEmail?.trim();
   const ccEmails: string[] = [];
-  if (isExterno && data.emailOrientador?.trim()) {
-    ccEmails.push(data.emailOrientador.trim());
+  if (isExterno) {
+    if (data.emailOrientador?.trim()) {
+      ccEmails.push(data.emailOrientador.trim());
+    }
+    // Creator also gets a copy when booking for an external user
+    if (data.criadoPorEmail?.trim() && data.criadoPorEmail.trim() !== toEmail) {
+      ccEmails.push(data.criadoPorEmail.trim());
+    }
   }
 
   console.log(`║ TO  : ${toEmail || '(none)'}`);
