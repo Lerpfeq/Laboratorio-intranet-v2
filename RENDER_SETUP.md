@@ -22,6 +22,9 @@ O arquivo `render.yaml` na raiz do projeto já contém todas as configurações 
    - `NEXTAUTH_URL` - URL do seu app (ex: https://seu-app.onrender.com)
    - `GOOGLE_CLIENT_ID` - OAuth Google Client ID
    - `GOOGLE_CLIENT_SECRET` - OAuth Google Client Secret
+   - `EMAIL_USER` - E-mail Gmail (ex: lerpfeq@gmail.com)
+   - `EMAIL_PASS` - Senha de aplicativo do Gmail (ex: vptc vfog iqma ngyz)
+   - `NODE_VERSION` - Versão do Node.js (22)
 
 4. **Deploy!**
    - Clique em "Create Web Service"
@@ -135,3 +138,59 @@ curl https://seu-app.onrender.com/api/remove-background
 | **rembg (atual)** | ✅ FREE | 30-60s/imagem | Ilimitado |
 | **Render Starter** | $7/mês | Mais rápido | Ilimitado |
 | **Remove.bg API** | 50 grátis/mês, depois $0.20/img | 5-10s/imagem | Por crédito |
+
+---
+
+## 📧 Configuração de E-mail (Gmail SMTP)
+
+### Passo 1: Gerar Senha de Aplicativo no Gmail
+
+1. Acesse: https://myaccount.google.com/apppasswords
+2. Faça login com a conta **lerpfeq@gmail.com**
+3. Selecione:
+   - **App:** Mail
+   - **Device:** Other (custom name) → "Intranet LERP"
+4. Clique em **Generate**
+5. Copie a senha gerada (formato: `xxxx xxxx xxxx xxxx`)
+
+### Passo 2: Configurar no Render
+
+1. Acesse o dashboard do Render: https://dashboard.render.com/
+2. Selecione seu Web Service
+3. Vá em **Environment** → **Add Environment Variable**
+4. Adicione as variáveis:
+
+```
+EMAIL_USER=lerpfeq@gmail.com
+EMAIL_PASS=vptc vfog iqma ngyz
+```
+
+⚠️ **IMPORTANTE:** A senha deve ser copiada **sem espaços** ou com espaços, dependendo de como o Gmail gerou. A atual já está configurada corretamente.
+
+### Passo 3: Testar
+
+Após configurar, acesse:
+```
+https://seu-app.onrender.com/api/test-email
+```
+
+Deverá enviar um e-mail de teste para `lerpfeq@gmail.com` ou o destinatário configurado.
+
+### Observações
+
+- ✅ **Gmail SMTP é gratuito** até 500 e-mails/dia (mais que suficiente)
+- ✅ **Funciona no Render** (não precisa de Resend ou domínio próprio)
+- ✅ **E-mails chegam em qualquer endereço** (não apenas o remetente)
+- ⚠️ A senha de aplicativo **não expira**, mas pode ser revogada a qualquer momento no Google
+
+### Solução de Problemas
+
+**Erro: "Invalid login"**
+- Verifique se a senha está correta (sem espaços extras)
+- Confirme que a autenticação de 2 fatores está ativa no Gmail
+- Gere uma nova senha de aplicativo
+
+**E-mails não chegam**
+- Verifique a pasta de SPAM
+- Confirme que `EMAIL_USER` está correto
+- Teste enviando para outro e-mail
