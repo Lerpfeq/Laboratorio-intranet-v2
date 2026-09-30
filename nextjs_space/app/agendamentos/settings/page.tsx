@@ -414,17 +414,17 @@ export default function SettingsPage() {
         {showEditModal && (
           <div className="modal" onClick={() => setShowEditModal(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Editar Equipamento</h3>
+              <h3 style={{ marginBottom: '1.5rem' }}>Edit Equipment</h3>
               <div className="form-group">
-                <label>Nome *</label>
+                <label>Name *</label>
                 <input value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} />
               </div>
               <div className="form-group">
-                <label>Descrição</label>
+                <label>Description</label>
                 <textarea value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} rows={3} />
               </div>
               <div className="form-group">
-                <label>Link SOP</label>
+                <label>SOP Link</label>
                 <input value={formData.sopLink} onChange={(e) => setFormData({ ...formData, sopLink: e.target.value })} />
               </div>
 
@@ -432,9 +432,9 @@ export default function SettingsPage() {
               {isAdmin && (
                 <div className="form-group">
                   <label style={{ fontWeight: 600 }}>
-                    🔗 Equipamentos Associados
+                    🔗 Associated Equipment
                     <span style={{ fontWeight: 400, color: '#666', fontSize: '0.85rem', display: 'block', marginTop: '2px' }}>
-                      Quando este equipamento for agendado, o sistema avisará se algum associado já estiver ocupado.
+                      When this equipment is booked, the system will warn if any associated equipment is already occupied.
                     </span>
                   </label>
                   <div style={{
@@ -442,7 +442,7 @@ export default function SettingsPage() {
                     maxHeight: '180px', overflowY: 'auto', marginTop: '6px',
                   }}>
                     {equipamentos.filter((eq) => eq.id !== showEditModal.id).length === 0 ? (
-                      <p style={{ color: '#999', margin: 0, fontSize: '0.9rem' }}>Nenhum outro equipamento cadastrado.</p>
+                      <p style={{ color: '#999', margin: 0, fontSize: '0.9rem' }}>No other equipment registered.</p>
                     ) : (
                       equipamentos
                         .filter((eq) => eq.id !== showEditModal.id)
@@ -471,9 +471,9 @@ export default function SettingsPage() {
               )}
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button className="button button-secondary" onClick={() => setShowEditModal(null)}>Cancelar</button>
+                <button className="button button-secondary" onClick={() => setShowEditModal(null)}>Cancel</button>
                 <button className="button button-primary" onClick={handleUpdateEquipamento} disabled={saving}>
-                  {saving ? 'Salvando...' : 'Salvar'}
+                  {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>

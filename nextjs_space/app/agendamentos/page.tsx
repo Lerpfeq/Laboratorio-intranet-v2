@@ -563,7 +563,7 @@ export default function AgendamentosPage() {
               {/* Associated equipment conflict warning */}
               {checkingConflicts && (
                 <div style={{ padding: '8px 12px', background: '#f5f5f5', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.85rem', color: '#666' }}>
-                  🔍 Verificando disponibilidade dos equipamentos associados...
+                  🔍 Checking availability of associated equipment...
                 </div>
               )}
               {!checkingConflicts && conflitosAssociados.length > 0 && (
@@ -572,17 +572,17 @@ export default function AgendamentosPage() {
                   borderRadius: '6px', padding: '12px 16px', marginBottom: '1rem',
                 }}>
                   <div style={{ fontWeight: 600, color: '#856404', marginBottom: '8px' }}>
-                    ⚠️ Atenção: Equipamento(s) associado(s) já agendado(s) neste período
+                    ⚠️ Warning: Associated equipment already booked in this period
                   </div>
                   {conflitosAssociados.map((c, i) => (
                     <div key={i} style={{ fontSize: '0.875rem', color: '#664d03', marginBottom: '4px' }}>
-                      • <strong>{c.equipamentoNome}</strong> está agendado por <strong>{c.agendadoPor}</strong>{' '}
-                      de {new Date(c.inicio).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}{' '}
-                      até {new Date(c.fim).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}
+                      • <strong>{c.equipamentoNome}</strong> is booked by <strong>{c.agendadoPor}</strong>{' '}
+                      from {new Date(c.inicio).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}{' '}
+                      to {new Date(c.fim).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}
                     </div>
                   ))}
                   <div style={{ fontSize: '0.8rem', color: '#856404', marginTop: '8px', fontStyle: 'italic' }}>
-                    Você pode continuar o agendamento, mas atenção: estes equipamentos são interdependentes.
+                    You can still proceed, but note that these equipment are interdependent.
                   </div>
                 </div>
               )}
