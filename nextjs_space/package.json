@@ -146,5 +146,6 @@
     "> 0.5%",
     "last 2 versions",
     "not dead"
-  ]
+  ],
+  "packageManager": "npm@10.9.2"
 }
