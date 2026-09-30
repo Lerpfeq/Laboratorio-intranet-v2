@@ -50,10 +50,14 @@ export async function GET(request: NextRequest) {
       });
       return NextResponse.json(equipments);
     } else {
-      // Regular user - only sees authorized equipment
+      // Regular user - sees equipment they're authorized for OR equipment with no
+      // authorizations at all (unrestricted equipment, open to everyone).
       const equipments = await prisma.equipamento.findMany({
         where: {
-          autorizacoes: { some: { userId } },
+          OR: [
+            { autorizacoes: { some: { userId } } }, // user has any authorization
+            { autorizacoes: { none: {} } },          // equipment has no restrictions at all
+          ],
         },
         include: {
           autorizacoes: {
