@@ -2,33 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Resend } from "resend";
-import nodemailer from "nodemailer";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /**
- * GET  /api/test-email — Ultra-verbose diagnostic (no email sent)
+ * GET  /api/test-email — Diagnostic (no email sent)
  * POST /api/test-email — Send a real test email (Admin only)
  *
- * Supports Resend (preferred) and SMTP (legacy fallback).
- * FROM email hardcoded to "onboarding@resend.dev" for Resend testing.
+ * Transport priority:
+ *   1. SendGrid  (SENDGRID_API_KEY)  — recommended, works on Render ✅
+ *   2. Resend    (RESEND_API_KEY)    — requires domain for other recipients
+ *   3. SMTP      (EMAIL_PASS)        — blocked on Render ❌
  */
 
-/* ─── helpers ─── */
-const ts = () => new Date().toISOString();
+const ts   = () => new Date().toISOString();
 const mask = (v: string | undefined) => {
-  if (!v) return "(undefined)";
+  if (!v) return "(not set)";
   if (v.length <= 6) return `****(len=${v.length})`;
-  return v.slice(0, 4) + "****" + v.slice(-4) + ` (len=${v.length})`;
+  return `${v.slice(0, 4)}...${v.slice(-4)} (len=${v.length})`;
 };
 
-/* ─── FROM address for Resend (hardcoded for reliability) ─── */
-const RESEND_FROM = "LERP <onboarding@resend.dev>";
-
 /* ═══════════════════════════════════════════════════════════════ */
-/* GET: full diagnostic — env vars, key validation, API test     */
+/* GET: diagnostic                                                 */
 /* ═══════════════════════════════════════════════════════════════ */
 export async function GET() {
   const steps: { time: string; step: string; result: string }[] = [];
@@ -38,154 +34,81 @@ export async function GET() {
   };
 
   try {
-    // Auth
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
     log("Auth", `userId=${session.user.id}`);
 
-    // ─── RESEND_API_KEY deep inspection ───
-    const rawKey = process.env.RESEND_API_KEY;
-    log("RESEND_API_KEY typeof", typeof rawKey);
-    log("RESEND_API_KEY undefined?", String(rawKey === undefined));
-    log("RESEND_API_KEY null?", String(rawKey === null));
-    log("RESEND_API_KEY empty?", String(rawKey === ""));
-    log("RESEND_API_KEY length", String(rawKey?.length ?? "N/A"));
-    log("RESEND_API_KEY trimmed length", String(rawKey?.trim()?.length ?? "N/A"));
-    log("RESEND_API_KEY first 10", rawKey ? `"${rawKey.slice(0, 10)}..."` : "N/A");
-    log("RESEND_API_KEY starts re_?", String(rawKey?.startsWith("re_") ?? "N/A"));
-    log("RESEND_API_KEY truthy?", String(!!rawKey));
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { email: true, name: true, isAdmin: true },
+    });
+    log("User", `${user?.name} <${user?.email}> isAdmin=${user?.isAdmin}`);
 
-    // Check for whitespace issues
-    if (rawKey && rawKey !== rawKey.trim()) {
-      log("⚠️ WHITESPACE", `Key has extra whitespace! raw="${rawKey.length}" trimmed="${rawKey.trim().length}"`);
-    }
+    // ─── Env var inspection ───
+    const sgKey  = process.env.SENDGRID_API_KEY;
+    const rsKey  = process.env.RESEND_API_KEY;
+    const emUser = process.env.EMAIL_USER;
+    const emPass = process.env.EMAIL_PASS;
 
-    // ─── Other env vars ───
-    const resendFrom = process.env.RESEND_FROM_EMAIL;
-    const emailUser = process.env.EMAIL_USER;
-    const emailPass = process.env.EMAIL_PASS;
+    log("SENDGRID_API_KEY", mask(sgKey));
+    log("RESEND_API_KEY",   mask(rsKey));
+    log("EMAIL_USER",       emUser || "(not set)");
+    log("EMAIL_PASS",       mask(emPass));
 
-    log("RESEND_FROM_EMAIL", resendFrom || `(not set — will use "${RESEND_FROM}")`);
-    log("EMAIL_USER", emailUser || "NOT SET");
-    log("EMAIL_PASS", emailPass ? `SET (len=${emailPass.length})` : "NOT SET");
-    log("NODE_ENV", process.env.NODE_ENV || "not set");
-
-    // ─── Transport decision ───
-    const trimmedKey = rawKey?.trim();
+    // ─── Determine transport ───
     let transport: string;
-    if (trimmedKey && trimmedKey.length > 0) {
-      transport = "RESEND ✅";
-    } else if (emailPass) {
-      transport = "SMTP ⚠️ (legacy, may be blocked)";
+    if (sgKey && sgKey.trim().length > 0) {
+      transport = "sendgrid";
+      log("Transport selected", "SENDGRID ✅");
+    } else if (rsKey && rsKey.trim().length > 0) {
+      transport = "resend";
+      log("Transport selected", "RESEND (may be limited without domain)");
+    } else if (emPass && emPass.trim().length > 0) {
+      transport = "smtp";
+      log("Transport selected", "SMTP ⚠️ (BLOCKED on Render — will fail)");
     } else {
-      transport = "NONE ❌ (no RESEND_API_KEY or EMAIL_PASS)";
+      transport = "none";
+      log("Transport selected", "NONE ❌ — no credentials configured");
     }
-    log("Selected transport", transport);
-    log("FROM email (Resend)", RESEND_FROM);
 
-    // ─── Scan ALL env vars for email/smtp/resend ───
-    const relatedVars: Record<string, string> = {};
-    for (const key of Object.keys(process.env).sort()) {
-      if (/email|mail|smtp|resend/i.test(key)) {
-        relatedVars[key] = mask(process.env[key]);
+    const allRelatedEnvVars: Record<string, string> = {};
+    for (const [k, v] of Object.entries(process.env)) {
+      if (/email|mail|smtp|resend|sendgrid/i.test(k)) {
+        allRelatedEnvVars[k] = mask(v);
       }
     }
-    log("All related env vars", JSON.stringify(relatedVars));
-
-    // ─── Test Resend API key validity ───
-    let resendValid = false;
-    let resendError = "";
-    let resendDomains: string[] = [];
-
-    if (trimmedKey && trimmedKey.length > 0) {
-      log("Resend API test", "Testing API key by calling resend.domains.list()...");
-      try {
-        const resend = new Resend(trimmedKey);
-        const listStart = Date.now();
-        const { data: domainsData, error: domainsError } = await resend.domains.list();
-        const listMs = Date.now() - listStart;
-
-        if (domainsError) {
-          resendError = domainsError.message;
-          log("Resend API test", `❌ API returned error in ${listMs}ms: ${domainsError.message}`);
-          log("Resend error details", JSON.stringify(domainsError));
-
-          // Diagnose
-          if (domainsError.message.includes("invalid") || domainsError.message.includes("unauthorized")) {
-            log("🔍 Diagnosis", "API key appears INVALID. Go to resend.com/api-keys and create a new one");
-          }
-        } else {
-          resendValid = true;
-          resendDomains = domainsData?.data?.map((d: any) => `${d.name} (${d.status})`) || [];
-          log("Resend API test", `✅ API key VALID in ${listMs}ms`);
-          log("Resend domains", resendDomains.length > 0 ? resendDomains.join(", ") : "(none — using onboarding@resend.dev)");
-        }
-      } catch (err: any) {
-        resendError = err?.message || String(err);
-        log("Resend API test", `❌ EXCEPTION: ${resendError}`);
-        log("Resend error type", err?.name || "unknown");
-        log("Resend error code", err?.statusCode || err?.status || err?.code || "N/A");
-
-        try {
-          log("Resend error full", JSON.stringify(err, Object.getOwnPropertyNames(err)));
-        } catch {
-          log("Resend error string", String(err));
-        }
-      }
-    } else {
-      log("Resend API test", "⏭️ Skipped — no RESEND_API_KEY set");
-    }
-
-    // ─── User info ───
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    log("User", `${user?.name} <${user?.email}>, category=${user?.category}`);
+    log("All email-related env vars", JSON.stringify(allRelatedEnvVars));
+    log("nodeVersion", process.env.npm_config_node_version || process.version);
 
     return NextResponse.json({
       success: true,
       transport,
-      fromEmail: RESEND_FROM,
-      diagnostic: {
-        resendApiKey: {
-          set: !!rawKey,
-          length: rawKey?.length ?? 0,
-          trimmedLength: trimmedKey?.length ?? 0,
-          hasWhitespace: rawKey ? rawKey !== rawKey.trim() : false,
-          startsWithRe: rawKey?.startsWith("re_") ?? false,
-          first10: rawKey ? rawKey.slice(0, 10) + "..." : null,
-          valid: resendValid,
-          error: resendError || null,
-          domains: resendDomains,
-        },
-        fromEmail: RESEND_FROM,
-        emailUser: emailUser || null,
-        emailPassSet: !!emailPass,
-        nodeEnv: process.env.NODE_ENV || null,
-        nodeVersion: process.version,
-        userEmail: user?.email || null,
-        isAdmin: user?.category === "Admin",
+      user: { email: user?.email, name: user?.name, isAdmin: user?.isAdmin },
+      envVars: {
+        SENDGRID_API_KEY: mask(sgKey),
+        RESEND_API_KEY:   mask(rsKey),
+        EMAIL_USER:       emUser || "(not set)",
+        EMAIL_PASS:       mask(emPass),
       },
-      allRelatedEnvVars: relatedVars,
+      allRelatedEnvVars,
       steps,
       howToFix: {
-        noApiKey: "Add RESEND_API_KEY to Render env vars (go to resend.com → API Keys → Create)",
-        invalidKey: "Go to resend.com/api-keys, delete old key, create new one, update in Render",
-        fromError: `Using "${RESEND_FROM}" — this always works without domain verification`,
-        smtpBlocked: "SMTP ports are blocked on Render — use Resend instead",
+        sendgrid: "1) Create free account at sendgrid.com, 2) Verify lerpfeq@gmail.com as sender at sendgrid.com/ui/account/sender-management, 3) Create API key at sendgrid.com/ui/account/billing → API Keys, 4) Add SENDGRID_API_KEY to Render env vars",
+        resend: "Resend free tier only sends to own email without domain. Use SendGrid instead.",
+        smtp: "SMTP ports (587/465) are BLOCKED on Render.com. Use SendGrid instead.",
       },
     });
-  } catch (error: any) {
-    log("FATAL", error?.message || String(error));
-    console.error("[test-email-GET] Fatal:", error);
-    return NextResponse.json({ success: false, error: error?.message, steps }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
-/* POST: send a real test email (Admin only)                     */
+/* POST: send test email                                           */
 /* ═══════════════════════════════════════════════════════════════ */
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   const steps: { time: string; step: string; result: string }[] = [];
   const log = (step: string, result: string) => {
     steps.push({ time: ts(), step, result });
@@ -193,293 +116,199 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    log("START", `POST /api/test-email at ${ts()}`);
-
-    // Auth + Admin check
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (user?.category !== "Admin") {
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { email: true, name: true, isAdmin: true },
+    });
+
+    if (!user?.isAdmin) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
-    log("Admin", `✅ ${user.name} <${user.email}>`);
 
-    // Recipient
-    let recipient = user.email || "";
-    try {
-      const body = await request.json().catch(() => ({}));
-      if ((body as any)?.to) recipient = (body as any).to;
-    } catch { /* optional */ }
+    log("User", `${user.name} <${user.email}>`);
 
-    if (!recipient) {
-      return NextResponse.json({ error: "No recipient email", steps }, { status: 400 });
-    }
-    log("Recipient (TO)", recipient);
+    const body = await req.json().catch(() => ({}));
+    const recipient = body.to || user.email || "lerpfeq@gmail.com";
+    const subject   = body.subject || `[LERP] Test Email — ${ts()}`;
 
-    // ─── Transport detection with deep logging ───
-    const rawKey = process.env.RESEND_API_KEY;
-    const trimmedKey = rawKey?.trim();
-    const emailPass = process.env.EMAIL_PASS;
+    log("Recipient", recipient);
 
-    log("RESEND_API_KEY", rawKey ? `SET (first10="${rawKey.slice(0, 10)}...", len=${rawKey.length}, trimmed=${trimmedKey?.length})` : "❌ NOT SET");
-    log("EMAIL_PASS", emailPass ? `SET (len=${emailPass.length})` : "NOT SET");
+    const sgKey  = process.env.SENDGRID_API_KEY?.trim();
+    const rsKey  = process.env.RESEND_API_KEY?.trim();
+    const emPass = process.env.EMAIL_PASS?.trim();
+    const emUser = process.env.EMAIL_USER || "lerpfeq@gmail.com";
 
-    const useResend = !!(trimmedKey && trimmedKey.length > 0);
-    const useSmtp = !useResend && !!(emailPass && emailPass.length > 0);
+    // ─── Select transport ───
+    const useSendGrid = !!(sgKey && sgKey.length > 0);
+    const useResend   = !useSendGrid && !!(rsKey && rsKey.length > 0);
+    const useSmtp     = !useSendGrid && !useResend && !!(emPass && emPass.length > 0);
 
-    log("Method selected", useResend ? "RESEND ✅" : useSmtp ? "SMTP ⚠️" : "NONE ❌");
-
-    if (!useResend && !useSmtp) {
+    if (!useSendGrid && !useResend && !useSmtp) {
       return NextResponse.json({
         success: false,
-        error: "No email transport configured",
+        error: "No email transport configured. Add SENDGRID_API_KEY to Render env vars.",
+        howToFix: "Create free SendGrid account → verify lerpfeq@gmail.com as sender → create API key → add SENDGRID_API_KEY to Render",
         steps,
-        fix: "Add RESEND_API_KEY to Render env vars. Get one at resend.com/api-keys",
-        envState: {
-          RESEND_API_KEY: rawKey === undefined ? "UNDEFINED" : rawKey === "" ? "EMPTY_STRING" : `SET(len=${rawKey?.length})`,
-          EMAIL_PASS: emailPass === undefined ? "UNDEFINED" : emailPass === "" ? "EMPTY_STRING" : `SET(len=${emailPass?.length})`,
-        },
       }, { status: 500 });
     }
 
-    // ─── Build test email HTML ───
-    const now = new Date();
-    const dateStr = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-    const method = useResend ? "Resend API" : "Gmail SMTP";
+    const method = useSendGrid ? "SendGrid API" : useResend ? "Resend API" : "Gmail SMTP";
+    log("Method selected", method);
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f4f4f4;">
-  <div style="max-width:550px;margin:20px auto;background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
-    <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;text-align:center;">
-      <h1 style="color:white;margin:0;font-size:22px;">📧 Email System Test</h1>
-      <p style="color:rgba(255,255,255,0.85);margin:8px 0 0 0;font-size:14px;">LERP — FEQ/UNICAMP</p>
-    </div>
-    <div style="padding:25px 30px;">
-      <p style="font-size:16px;color:#333;"><strong>✅ Email system is working!</strong></p>
-      <p style="color:#555;">Automated test from LERP Intranet.</p>
-      <table style="width:100%;border-collapse:collapse;margin:15px 0;">
-        <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;"><strong>Transport</strong></td>
-            <td style="padding:8px 12px;border-bottom:1px solid #eee;">${method} ✅</td></tr>
-        <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;"><strong>From</strong></td>
-            <td style="padding:8px 12px;border-bottom:1px solid #eee;">${useResend ? RESEND_FROM : "lerpfeq@gmail.com"}</td></tr>
-        <tr><td style="padding:8px 12px;color:#666;border-bottom:1px solid #eee;"><strong>Date</strong></td>
-            <td style="padding:8px 12px;border-bottom:1px solid #eee;">${dateStr}</td></tr>
-        <tr><td style="padding:8px 12px;color:#666;"><strong>Node</strong></td>
-            <td style="padding:8px 12px;">${process.version}</td></tr>
-      </table>
-      <div style="text-align:center;margin:25px 0;">
-        <a href="https://laborat-rio-intranet.onrender.com/agendamentos" target="_blank"
-           style="display:inline-block;background:#4285f4;color:white;padding:14px 28px;
-                  text-decoration:none;border-radius:6px;font-weight:bold;font-size:15px;">
-          📅 Open Scheduling
-        </a>
-      </div>
-      <p style="color:#888;font-size:13px;">If you received this, scheduling notifications will also work.</p>
-    </div>
-    <div style="background:#f9f9f9;padding:15px;text-align:center;border-top:1px solid #eee;">
-      <p style="margin:0;color:#999;font-size:12px;">LERP — Laboratório de Engenharia de Reações Poliméricas</p>
-    </div>
+<body style="font-family:Arial,sans-serif;padding:20px;background:#f4f4f4;">
+  <div style="max-width:500px;margin:0 auto;background:white;border-radius:8px;padding:30px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <h2 style="color:#667eea;">✅ LERP Email Test — ${method}</h2>
+    <table style="width:100%;border-collapse:collapse;">
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#555;"><strong>Transport</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">${method}</td></tr>
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#555;"><strong>Sent at</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">${ts()}</td></tr>
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#555;"><strong>From</strong></td><td style="padding:8px;border-bottom:1px solid #eee;">${emUser}</td></tr>
+      <tr><td style="padding:8px;color:#555;"><strong>To</strong></td><td style="padding:8px;">${recipient}</td></tr>
+    </table>
+    <p style="margin-top:20px;color:#888;font-size:13px;">This is an automated test from LERP Intranet.</p>
   </div>
 </body></html>`;
 
-    const subject = `📧 LERP Email Test — ${dateStr}`;
+    // ─── SendGrid ───
+    if (useSendGrid) {
+      log("SendGrid send", `Calling SendGrid API for ${recipient}...`);
+      const startMs = Date.now();
 
-    // ═══════════════════════════════════════════
-    // RESEND PATH
-    // ═══════════════════════════════════════════
-    if (useResend) {
-      log("Resend", `Creating client with key "${trimmedKey!.slice(0, 10)}..." (${trimmedKey!.length} chars)`);
-      log("Resend FROM", RESEND_FROM);
-      log("Resend TO", recipient);
-      log("Resend SUBJECT", subject);
-
-      const resend = new Resend(trimmedKey!);
-
-      // Step 1: Validate API key by listing domains
-      log("Resend validate", "Calling resend.domains.list() to verify API key...");
-      try {
-        const validateStart = Date.now();
-        const { data: domData, error: domError } = await resend.domains.list();
-        const validateMs = Date.now() - validateStart;
-
-        if (domError) {
-          log("Resend validate", `❌ API key ERROR in ${validateMs}ms: ${domError.message}`);
-          log("Resend validate detail", JSON.stringify(domError));
-          return NextResponse.json({
-            success: false,
-            transport: "resend",
-            error: `Resend API key validation failed: ${domError.message}`,
-            steps,
-            fix: "Your RESEND_API_KEY appears invalid. Go to resend.com/api-keys and create a new one.",
-          }, { status: 500 });
-        }
-
-        const domains = domData?.data?.map((d: any) => `${d.name}(${d.status})`) || [];
-        log("Resend validate", `✅ API key VALID in ${validateMs}ms — domains: [${domains.join(", ")}]`);
-      } catch (valErr: any) {
-        log("Resend validate", `❌ EXCEPTION: ${valErr?.message}`);
-        // Don't return — still try to send (some Resend plans may not have domains.list)
-        log("Resend validate", "Continuing to try send anyway...");
-      }
-
-      // Step 2: Actually send the email
-      log("Resend send", `Calling resend.emails.send() NOW...`);
-      const sendStart = Date.now();
-
-      try {
-        const sendResult = await resend.emails.send({
-          from: RESEND_FROM,
-          to: [recipient],
+      const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${sgKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: recipient }] }],
+          from: { email: emUser, name: "LERP — FEQ/UNICAMP" },
           subject,
-          html,
-        });
+          content: [{ type: "text/html", value: html }],
+        }),
+      });
 
-        const sendMs = Date.now() - sendStart;
+      const ms = Date.now() - startMs;
+      log("SendGrid response", `HTTP ${res.status} in ${ms}ms`);
 
-        log("Resend send", `API call completed in ${sendMs}ms`);
-        log("Resend raw result", JSON.stringify(sendResult));
-
-        const { data: sendData, error: sendError } = sendResult;
-
-        if (sendError) {
-          log("Resend send ERROR", `message: ${sendError.message}`);
-          log("Resend send ERROR name", (sendError as any).name || "N/A");
-          log("Resend send ERROR statusCode", String((sendError as any).statusCode || "N/A"));
-          log("Resend send ERROR full", JSON.stringify(sendError));
-
-          // Diagnose specific errors
-          let diagnosis = "";
-          const msg = sendError.message.toLowerCase();
-          if (msg.includes("api key")) {
-            diagnosis = "API key is invalid or revoked. Create a new one at resend.com/api-keys";
-          } else if (msg.includes("domain") || msg.includes("not verified") || msg.includes("not allowed")) {
-            diagnosis = `FROM address domain not verified. Current FROM is "${RESEND_FROM}" which should work without verification. If you changed RESEND_FROM_EMAIL, remove it and use default.`;
-          } else if (msg.includes("rate") || msg.includes("limit")) {
-            diagnosis = "Rate limited. Free tier is 2 emails/second, 100/day. Wait and retry.";
-          } else if (msg.includes("validation") || msg.includes("invalid")) {
-            diagnosis = `Validation error. Check TO address "${recipient}" is valid.`;
-          } else {
-            diagnosis = "Unknown error. Check the full error details above.";
-          }
-          log("🔍 Diagnosis", diagnosis);
-
-          return NextResponse.json({
-            success: false,
-            transport: "resend",
-            error: sendError.message,
-            errorDetails: sendError,
-            sendMs,
-            fromUsed: RESEND_FROM,
-            toUsed: recipient,
-            diagnosis,
-            steps,
-          }, { status: 500 });
-        }
-
-        // SUCCESS!
-        log("Resend send", `✅ SUCCESS in ${sendMs}ms`);
-        log("Resend email id", sendData?.id || "N/A");
-        log("Resend full data", JSON.stringify(sendData));
-
+      if (res.status === 202) {
+        const msgId = res.headers.get("x-message-id") || "N/A";
+        log("SendGrid result", `✅ SUCCESS — message id: ${msgId}`);
         return NextResponse.json({
           success: true,
-          transport: "resend",
-          message: `✅ Test email sent to ${recipient} via Resend!`,
-          emailId: sendData?.id,
-          fromUsed: RESEND_FROM,
-          sendMs,
+          transport: "sendgrid",
+          message: `✅ Test email sent to ${recipient} via SendGrid!`,
+          messageId: msgId,
+          ms,
           steps,
         });
+      }
 
-      } catch (sendErr: any) {
-        const sendMs = Date.now() - sendStart;
+      let errBody = "";
+      try { errBody = await res.text(); } catch {}
+      log("SendGrid error", `HTTP ${res.status}: ${errBody}`);
 
-        log("Resend send EXCEPTION", `${sendErr?.message}`);
-        log("Resend exception name", sendErr?.name || "N/A");
-        log("Resend exception statusCode", String(sendErr?.statusCode || sendErr?.status || "N/A"));
-        log("Resend exception code", sendErr?.code || "N/A");
+      // Common error diagnosis
+      let diagnosis = "";
+      if (res.status === 401) diagnosis = "Invalid API key. Check SENDGRID_API_KEY in Render env vars.";
+      else if (res.status === 403) diagnosis = "Sender not verified. Go to sendgrid.com/ui/account/sender-management and verify lerpfeq@gmail.com";
+      else if (res.status === 429) diagnosis = "Rate limited. Free tier: 100/day.";
+      else diagnosis = `HTTP ${res.status}. Check SendGrid dashboard for details.`;
 
-        try {
-          log("Resend exception full", JSON.stringify(sendErr, Object.getOwnPropertyNames(sendErr)));
-        } catch {
-          log("Resend exception string", String(sendErr));
-        }
+      return NextResponse.json({
+        success: false,
+        transport: "sendgrid",
+        error: `SendGrid error ${res.status}: ${errBody.slice(0, 300)}`,
+        diagnosis,
+        steps,
+      }, { status: 500 });
+    }
 
+    // ─── Resend (fallback) ───
+    if (useResend) {
+      log("Resend send", `Calling Resend API for ${recipient}...`);
+      const { Resend } = await import("resend");
+      const resend = new Resend(rsKey!);
+      const startMs = Date.now();
+      const { data, error } = await resend.emails.send({
+        from: "LERP <onboarding@resend.dev>",
+        to: [recipient],
+        subject,
+        html,
+      });
+      const ms = Date.now() - startMs;
+
+      if (error) {
+        log("Resend error", error.message);
         return NextResponse.json({
           success: false,
           transport: "resend",
-          error: sendErr?.message || String(sendErr),
-          errorType: sendErr?.name,
-          sendMs,
-          fromUsed: RESEND_FROM,
-          toUsed: recipient,
+          error: error.message,
+          diagnosis: "Resend free tier only sends to lerpfeq@gmail.com without domain verification. Use SendGrid instead.",
           steps,
         }, { status: 500 });
       }
+
+      log("Resend result", `✅ id=${data?.id} (${ms}ms)`);
+      return NextResponse.json({
+        success: true,
+        transport: "resend",
+        message: `✅ Test email sent to ${recipient} via Resend!`,
+        messageId: data?.id,
+        ms,
+        steps,
+      });
     }
 
-    // ═══════════════════════════════════════════
-    // SMTP FALLBACK PATH
-    // ═══════════════════════════════════════════
-    const emailUser = process.env.EMAIL_USER || "lerpfeq@gmail.com";
-    const from = `"LERP — FEQ/UNICAMP" <${emailUser}>`;
-
-    log("SMTP", `host=smtp.gmail.com, port=587, user=${emailUser}`);
-    log("⚠️", "SMTP is typically BLOCKED on Render. Consider using Resend instead.");
-
+    // ─── SMTP (last resort, will fail on Render) ───
+    log("SMTP", "⚠️ Attempting SMTP — likely BLOCKED on Render");
+    const nodemailer = (await import("nodemailer")).default;
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
       secure: false,
-      auth: { user: emailUser, pass: emailPass! },
+      auth: { user: emUser, pass: emPass },
       connectionTimeout: 20000,
-      greetingTimeout: 20000,
-      socketTimeout: 20000,
-      tls: { rejectUnauthorized: false },
     });
-
+    const startMs = Date.now();
     try {
-      log("SMTP verify", "Testing connection...");
-      await transporter.verify();
-      log("SMTP verify", "✅ OK");
+      const info = await Promise.race([
+        transporter.sendMail({ from: `"LERP" <${emUser}>`, to: recipient, subject, html }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("SMTP connection timed out — port 587 is likely blocked on Render")), 22000)
+        ),
+      ]);
+      const ms = Date.now() - startMs;
+      log("SMTP result", `✅ sent (${ms}ms) id=${info.messageId}`);
+      return NextResponse.json({
+        success: true,
+        transport: "smtp",
+        message: `✅ Test email sent to ${recipient} via Gmail SMTP!`,
+        messageId: info.messageId,
+        ms,
+        steps,
+      });
     } catch (err: any) {
-      log("SMTP verify", `❌ FAILED: ${err?.message}`);
-      transporter.close();
+      const ms = Date.now() - startMs;
+      log("SMTP error", err?.message);
       return NextResponse.json({
         success: false,
         transport: "smtp",
-        error: `SMTP connection failed: ${err?.message}`,
+        error: `SMTP failed: ${err?.message}`,
+        diagnosis: "SMTP ports are BLOCKED on Render. Add SENDGRID_API_KEY to Render env vars instead.",
+        fix: "1) sendgrid.com → free account, 2) verify lerpfeq@gmail.com as sender, 3) create API key, 4) add SENDGRID_API_KEY to Render",
+        ms,
         steps,
-        fix: "SMTP ports are blocked on Render. Add RESEND_API_KEY env var instead.",
       }, { status: 500 });
     }
 
-    const sendStart = Date.now();
-    const info = await transporter.sendMail({ from, to: recipient, subject, html });
-    const sendMs = Date.now() - sendStart;
-    transporter.close();
-
-    log("SMTP send", `✅ OK in ${sendMs}ms — ${info.messageId}`);
-
-    return NextResponse.json({
-      success: true,
-      transport: "smtp",
-      message: `✅ Test email sent to ${recipient} via SMTP`,
-      messageId: info.messageId,
-      sendMs,
-      steps,
-    });
-
-  } catch (error: any) {
-    log("FATAL", `${error?.message || error}`);
-    console.error("[test-email-POST] Fatal:", error);
-    return NextResponse.json({
-      success: false,
-      error: error?.message || "Unknown error",
-      steps,
-    }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
   }
 }
