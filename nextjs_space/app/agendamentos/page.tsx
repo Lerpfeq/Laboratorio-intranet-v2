@@ -110,12 +110,11 @@ export default function AgendamentosPage() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/users');
-      if (res.ok) {
-        const data = await res.json();
-        setAllUsers(data.filter((u: UserInfo) => u.status === 'approved'));
-      }
-    } catch (err) { /* non-admin won't have access */ }
+      // /api/users returns approved users and is accessible to any authenticated
+      // user (needed so managers can book for internal users).
+      const res = await fetch('/api/users');
+      if (res.ok) setAllUsers(await res.json());
+    } catch (err) { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -260,6 +259,19 @@ export default function AgendamentosPage() {
   }
 
   const isAdmin = user?.category === 'Admin';
+
+  // Whether the current user can book on behalf of others (internal/external)
+  // for a given equipment: admins always, and managers (responsáveis) of it.
+  const canBookForOthersFor = (equipId: string): boolean => {
+    if (isAdmin) return true;
+    const eq = equipamentos.find((e) => e.id === equipId);
+    if (!eq) return false;
+    return (eq.autorizacoes || []).some(
+      (a: any) => a.userId === user?.id && a.tipo === 'RESPONSAVEL'
+    );
+  };
+  const canBookForOthers = canBookForOthersFor(formData.equipamentoId);
+
   const formatDateTime = (d: string) => {
     const date = new Date(d);
     return date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
@@ -294,6 +306,7 @@ export default function AgendamentosPage() {
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/reagentes">Reagent</Link>
             <Link href="/agendamentos" style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '4px' }}>Calendar</Link>
+            <Link href="/agendamentos/equipe">Team</Link>
             <Link href="/residuos">Waste</Link>
             {isAdmin && <Link href="/agendamentos/settings">Settings</Link>}
             {isAdmin && <Link href="/admin">Admin</Link>}
@@ -405,7 +418,20 @@ export default function AgendamentosPage() {
 
               <div className="form-group">
                 <label>Equipment *</label>
-                <select value={formData.equipamentoId} onChange={(e) => setFormData({ ...formData, equipamentoId: e.target.value })}>
+                <select
+                  value={formData.equipamentoId}
+                  onChange={(e) => {
+                    const newEquip = e.target.value;
+                    // If the user can't book for others on the newly selected
+                    // equipment, force "Myself".
+                    const allowOthers = canBookForOthersFor(newEquip);
+                    setFormData({
+                      ...formData,
+                      equipamentoId: newEquip,
+                      paraQuem: allowOthers ? formData.paraQuem : 'eu',
+                    });
+                  }}
+                >
                   <option value="">Select...</option>
                   {equipamentos.map((eq) => (
                     <option key={eq.id} value={eq.id}>{eq.nome}</option>
@@ -413,16 +439,26 @@ export default function AgendamentosPage() {
                 </select>
               </div>
 
-              <div className="form-group">
-                <label>Book for *</label>
-                <select value={formData.paraQuem} onChange={(e) => setFormData({ ...formData, paraQuem: e.target.value as any })}>
-                  <option value="eu">Myself</option>
-                  <option value="interno">Internal user</option>
-                  <option value="externo">External user</option>
-                </select>
-              </div>
+              {canBookForOthers ? (
+                <div className="form-group">
+                  <label>Book for *</label>
+                  <select value={formData.paraQuem} onChange={(e) => setFormData({ ...formData, paraQuem: e.target.value as any })}>
+                    <option value="eu">Myself</option>
+                    <option value="interno">Internal user</option>
+                    <option value="externo">External user</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>Book for</label>
+                  <input value="Myself" disabled style={{ background: '#f5f5f5', color: '#666' }} />
+                  <small style={{ color: '#888', display: 'block', marginTop: '4px' }}>
+                    Only equipment managers can book for other people.
+                  </small>
+                </div>
+              )}
 
-              {formData.paraQuem === 'interno' && (
+              {canBookForOthers && formData.paraQuem === 'interno' && (
                 <div className="form-group">
                   <label>Select user *</label>
                   <select value={formData.paraUsuarioInternoId} onChange={(e) => setFormData({ ...formData, paraUsuarioInternoId: e.target.value })}>
@@ -434,7 +470,7 @@ export default function AgendamentosPage() {
                 </div>
               )}
 
-              {formData.paraQuem === 'externo' && (
+              {canBookForOthers && formData.paraQuem === 'externo' && (
                 <>
                   <div className="form-group">
                     <label>External user name *</label>

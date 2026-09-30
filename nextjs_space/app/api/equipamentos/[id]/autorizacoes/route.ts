@@ -46,15 +46,6 @@ export async function POST(
     const { id } = await params;
     const isAdmin = user?.category === 'Admin';
 
-    if (!isAdmin) {
-      const isResponsavel = await prisma.autorizacaoEquipamento.findFirst({
-        where: { equipamentoId: id, userId: session.user.id, tipo: 'RESPONSAVEL' },
-      });
-      if (!isResponsavel) {
-        return NextResponse.json({ error: 'No permission' }, { status: 403 });
-      }
-    }
-
     const { userId, tipo } = await request.json();
 
     if (!userId || !tipo) {
@@ -63,6 +54,22 @@ export async function POST(
 
     if (!['RESPONSAVEL', 'TREINADO'].includes(tipo)) {
       return NextResponse.json({ error: 'Tipo deve ser RESPONSAVEL ou TREINADO' }, { status: 400 });
+    }
+
+    if (!isAdmin) {
+      const isResponsavel = await prisma.autorizacaoEquipamento.findFirst({
+        where: { equipamentoId: id, userId: session.user.id, tipo: 'RESPONSAVEL' },
+      });
+      if (!isResponsavel) {
+        return NextResponse.json({ error: 'No permission' }, { status: 403 });
+      }
+      // Managers (responsáveis) can only manage the trained list, not other managers.
+      if (tipo === 'RESPONSAVEL') {
+        return NextResponse.json(
+          { error: 'Only admins can manage managers (responsáveis)' },
+          { status: 403 }
+        );
+      }
     }
 
     // Check if user existe
@@ -104,6 +111,20 @@ export async function DELETE(
     const { id } = await params;
     const isAdmin = user?.category === 'Admin';
 
+    const { searchParams } = new URL(request.url);
+    const autorizacaoId = searchParams.get('autorizacaoId');
+
+    if (!autorizacaoId) {
+      return NextResponse.json({ error: 'autorizacaoId is required' }, { status: 400 });
+    }
+
+    const target = await prisma.autorizacaoEquipamento.findUnique({
+      where: { id: autorizacaoId },
+    });
+    if (!target || target.equipamentoId !== id) {
+      return NextResponse.json({ error: 'Authorization not found' }, { status: 404 });
+    }
+
     if (!isAdmin) {
       const isResponsavel = await prisma.autorizacaoEquipamento.findFirst({
         where: { equipamentoId: id, userId: session.user.id, tipo: 'RESPONSAVEL' },
@@ -111,13 +132,13 @@ export async function DELETE(
       if (!isResponsavel) {
         return NextResponse.json({ error: 'No permission' }, { status: 403 });
       }
-    }
-
-    const { searchParams } = new URL(request.url);
-    const autorizacaoId = searchParams.get('autorizacaoId');
-
-    if (!autorizacaoId) {
-      return NextResponse.json({ error: 'autorizacaoId is required' }, { status: 400 });
+      // Managers (responsáveis) can only remove trained users, not other managers.
+      if (target.tipo === 'RESPONSAVEL') {
+        return NextResponse.json(
+          { error: 'Only admins can remove managers (responsáveis)' },
+          { status: 403 }
+        );
+      }
     }
 
     await prisma.autorizacaoEquipamento.delete({

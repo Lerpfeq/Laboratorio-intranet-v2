@@ -17,6 +17,25 @@ export async function GET(request: NextRequest) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     const isAdmin = user?.category === 'Admin';
 
+    const { searchParams } = new URL(request.url);
+    const scope = searchParams.get('scope');
+
+    // Read-only view of ALL equipment (used by the team page). Available to any
+    // authenticated user with booking access.
+    if (scope === 'all') {
+      const equipments = await prisma.equipamento.findMany({
+        include: {
+          autorizacoes: {
+            include: {
+              user: { select: { id: true, name: true, email: true } },
+            },
+          },
+        },
+        orderBy: { nome: 'asc' },
+      });
+      return NextResponse.json(equipments);
+    }
+
     if (isAdmin) {
       const equipments = await prisma.equipamento.findMany({
         include: {

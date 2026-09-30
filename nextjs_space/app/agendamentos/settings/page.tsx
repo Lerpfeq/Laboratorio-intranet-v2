@@ -52,32 +52,29 @@ export default function SettingsPage() {
   const fetchUser = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
-        if (data.category !== 'Admin') {
-          router.replace('/agendamentos');
-        }
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
-
-  const fetchEquipamentos = useCallback(async () => {
-    try {
-      const res = await fetch('/api/equipamentos');
-      if (res.ok) setEquipamentos(await res.json());
+      if (res.ok) setUser(await res.json());
     } catch (error) {
       console.error('Error:', error);
     }
   }, []);
 
+  const fetchEquipamentos = useCallback(async () => {
+    try {
+      // scope=all so managers (responsáveis) also see the full list; per-row
+      // actions are gated client-side by role and enforced server-side.
+      const res = await fetch('/api/equipamentos?scope=all');
+      if (res.ok) setEquipamentos(await res.json());
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/users');
+      // /api/users is accessible to any authenticated user (approved users only).
+      const res = await fetch('/api/users');
       if (res.ok) setAllUsers(await res.json());
     } catch (error) {
       console.error('Error:', error);
@@ -196,9 +193,32 @@ export default function SettingsPage() {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
-  if (!user || user.category !== 'Admin') return null;
+  if (!user) return null;
 
-  const approvedUsers = allUsers.filter((u) => u.status === 'approved');
+  const isAdmin = user.category === 'Admin';
+
+  // Is the current user a manager (responsável) for a specific equipment?
+  const isManagerOf = (eq: Equipamento) =>
+    eq.autorizacoes.some((a) => a.userId === user.id && a.tipo === 'RESPONSAVEL');
+
+  // Can the user edit this equipment (info, SOP, trained list)?
+  const canEdit = (eq: Equipamento) => isAdmin || isManagerOf(eq);
+
+  // Access gate: only admins or users who manage at least one equipment.
+  const managesSomething = equipamentos.some(isManagerOf);
+  if (!isAdmin && !managesSomething) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <p>You do not have permission to manage equipment.</p>
+        <Link href="/agendamentos" className="button button-primary" style={{ marginTop: '1rem', display: 'inline-block' }}>
+          ← Back to Calendar
+        </Link>
+      </div>
+    );
+  }
+
+  // /api/users already returns only approved users.
+  const approvedUsers = allUsers;
 
   return (
     <div>
@@ -213,8 +233,9 @@ export default function SettingsPage() {
           <nav className="nav-tabs">
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/agendamentos">Calendar</Link>
+            <Link href="/agendamentos/equipe">Team</Link>
             <Link href="/agendamentos/settings" style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '4px' }}>Settings</Link>
-            {user.category === 'Admin' && <Link href="/admin">Admin</Link>}
+            {isAdmin && <Link href="/admin">Admin</Link>}
           </nav>
           <div className="user-menu">
             <span>{user.name || user.email}</span>
@@ -234,17 +255,21 @@ export default function SettingsPage() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <p style={{ color: '#666' }}>
-            Manage equipment and user authorizations.
+            {isAdmin
+              ? 'Manage equipment and user authorizations.'
+              : 'You can edit the equipment you manage and its trained users.'}
           </p>
-          <button
-            className="button button-primary"
-            onClick={() => {
-              setFormData({ nome: '', descricao: '', sopLink: '' });
-              setShowCreateModal(true);
-            }}
-          >
-            + New Equipment
-          </button>
+          {isAdmin && (
+            <button
+              className="button button-primary"
+              onClick={() => {
+                setFormData({ nome: '', descricao: '', sopLink: '' });
+                setShowCreateModal(true);
+              }}
+            >
+              + New Equipment
+            </button>
+          )}
         </div>
 
         {/* Equipment Table */}
@@ -302,35 +327,41 @@ export default function SettingsPage() {
                         {treinados.length === 0 && <span style={{ color: '#999' }}>—</span>}
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          <button
-                            className="button"
-                            style={{ background: '#3498db', color: 'white', padding: '6px 12px', fontSize: '0.8rem' }}
-                            onClick={() => {
-                              setShowAuthModal(eq);
-                              setAuthForm({ userId: '', tipo: 'TREINADO' });
-                            }}
-                          >
-                            👥 Authorizations
-                          </button>
-                          <button
-                            className="button"
-                            style={{ background: '#f39c12', color: 'white', padding: '6px 12px', fontSize: '0.8rem' }}
-                            onClick={() => {
-                              setFormData({ nome: eq.nome, descricao: eq.descricao || '', sopLink: eq.sopLink || '' });
-                              setShowEditModal(eq);
-                            }}
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            className="button button-danger"
-                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                            onClick={() => handleDeleteEquipamento(eq.id, eq.nome)}
-                          >
-                            🗑️
-                          </button>
-                        </div>
+                        {canEdit(eq) ? (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <button
+                              className="button"
+                              style={{ background: '#3498db', color: 'white', padding: '6px 12px', fontSize: '0.8rem' }}
+                              onClick={() => {
+                                setShowAuthModal(eq);
+                                setAuthForm({ userId: '', tipo: 'TREINADO' });
+                              }}
+                            >
+                              👥 Authorizations
+                            </button>
+                            <button
+                              className="button"
+                              style={{ background: '#f39c12', color: 'white', padding: '6px 12px', fontSize: '0.8rem' }}
+                              onClick={() => {
+                                setFormData({ nome: eq.nome, descricao: eq.descricao || '', sopLink: eq.sopLink || '' });
+                                setShowEditModal(eq);
+                              }}
+                            >
+                              ✏️ Edit
+                            </button>
+                            {isAdmin && (
+                              <button
+                                className="button button-danger"
+                                style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                                onClick={() => handleDeleteEquipamento(eq.id, eq.nome)}
+                              >
+                                🗑️
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: '#999', fontSize: '0.8rem' }}>Read-only</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -427,7 +458,7 @@ export default function SettingsPage() {
                     style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
                   >
                     <option value="TREINADO">Trained</option>
-                    <option value="RESPONSAVEL">Manager</option>
+                    {isAdmin && <option value="RESPONSAVEL">Manager</option>}
                   </select>
                 </div>
                 <button className="button button-success" onClick={handleAddAuth} disabled={saving} style={{ padding: '8px 16px' }}>
@@ -461,13 +492,17 @@ export default function SettingsPage() {
                             </span>
                           </td>
                           <td>
-                            <button
-                              className="button button-danger"
-                              style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                              onClick={() => handleRemoveAuth(auth.id)}
-                            >
-                              Remove
-                            </button>
+                            {(isAdmin || auth.tipo !== 'RESPONSAVEL') ? (
+                              <button
+                                className="button button-danger"
+                                style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                                onClick={() => handleRemoveAuth(auth.id)}
+                              >
+                                Remove
+                              </button>
+                            ) : (
+                              <span style={{ color: '#999', fontSize: '0.8rem' }}>—</span>
+                            )}
                           </td>
                         </tr>
                       ))}

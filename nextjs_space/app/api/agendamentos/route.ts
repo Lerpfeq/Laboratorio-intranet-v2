@@ -101,7 +101,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar authorization (Admin pode sempre, outros precisam authorization)
-    if (user.category !== 'Admin') {
+    const isAdmin = user.category === 'Admin';
+    let isResponsavel = false;
+    if (!isAdmin) {
       const autorizacao = await prisma.autorizacaoEquipamento.findFirst({
         where: { equipamentoId, userId: session.user.id },
       });
@@ -111,6 +113,21 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         );
       }
+      isResponsavel = await prisma.autorizacaoEquipamento
+        .findFirst({
+          where: { equipamentoId, userId: session.user.id, tipo: 'RESPONSAVEL' },
+        })
+        .then((a) => !!a);
+    }
+
+    // Only admins and equipment managers (responsáveis) can book on behalf of
+    // other people (internal or external). Regular users can only book for themselves.
+    const canBookForOthers = isAdmin || isResponsavel;
+    if (!canBookForOthers && paraQuem && paraQuem !== 'eu') {
+      return NextResponse.json(
+        { error: 'You can only book for yourself for this equipment' },
+        { status: 403 }
+      );
     }
 
     // External user validation
