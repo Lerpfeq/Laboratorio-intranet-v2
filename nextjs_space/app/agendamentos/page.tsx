@@ -572,7 +572,7 @@ export default function AgendamentosPage() {
                   borderRadius: '6px', padding: '12px 16px', marginBottom: '1rem',
                 }}>
                   <div style={{ fontWeight: 600, color: '#856404', marginBottom: '8px' }}>
-                    ⚠️ Aviso: Equipamento(s) associado(s) já agendado(s)
+                    ⚠️ Atenção: Equipamento(s) associado(s) já agendado(s) neste período
                   </div>
                   {conflitosAssociados.map((c, i) => (
                     <div key={i} style={{ fontSize: '0.875rem', color: '#664d03', marginBottom: '4px' }}>
@@ -582,7 +582,7 @@ export default function AgendamentosPage() {
                     </div>
                   ))}
                   <div style={{ fontSize: '0.8rem', color: '#856404', marginTop: '8px', fontStyle: 'italic' }}>
-                    Você pode continuar o agendamento, mas os equipamentos são interdependentes.
+                    Você pode continuar o agendamento, mas atenção: estes equipamentos são interdependentes.
                   </div>
                 </div>
               )}
@@ -655,7 +655,8 @@ export default function AgendamentosPage() {
               </table>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                {(isAdmin || showDetailModal.userId === user?.id) && (
+                {/* Only the creator of the booking can delete it */}
+                {showDetailModal.userId === user?.id && (
                   <button className="button button-danger" style={{ padding: '8px 16px' }} onClick={() => handleDelete(showDetailModal.id)}>
                     🗑️ Delete
                   </button>

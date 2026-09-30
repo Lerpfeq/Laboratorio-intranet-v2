@@ -39,12 +39,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid time range' }, { status: 400 });
     }
 
-    // Fetch the equipment and its associated equipment
+    // Fetch the equipment and its associated equipment (both directions)
     const equipment = await prisma.equipamento.findUnique({
       where: { id: equipamentoId },
       include: {
         equipamentosAssociados: { select: { id: true, nome: true } },
-        // Also include reverse: equipment that this one is associated WITH
         associadoPor: { select: { id: true, nome: true } },
       },
     });
@@ -53,23 +52,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ conflitos: [] });
     }
 
-    // Combine both directions of the association
-    const associados = [
+    // Step 1: direct associations (both directions)
+    const directAssoc = [
       ...equipment.equipamentosAssociados,
       ...equipment.associadoPor,
     ];
 
-    if (associados.length === 0) {
+    if (directAssoc.length === 0) {
       return NextResponse.json({ conflitos: [] });
     }
 
-    const associadosIds = associados.map((a) => a.id);
+    // Step 2: find "sibling" equipment — equipment that share at least one
+    // of the same dependencies as the equipment being booked.
+    // Example: A→C and B→C → when booking A, also warn if B is booked
+    // (because B is occupying C, which A also needs).
+    const directAssocIds = directAssoc.map((a) => a.id);
 
-    // Find overlapping bookings for associated equipment
+    const siblings = await prisma.equipamento.findMany({
+      where: {
+        id: { not: equipamentoId },
+        OR: [
+          // shares a dependency: has any of our direct deps as its own dep
+          { equipamentosAssociados: { some: { id: { in: directAssocIds } } } },
+          // or is depended upon by any of our direct deps
+          { associadoPor: { some: { id: { in: directAssocIds } } } },
+        ],
+      },
+      select: { id: true, nome: true },
+    });
+
+    // Build final candidate set: direct assoc + siblings (no duplicates, no self)
+    const candidateMap = new Map<string, string>();
+    for (const eq of [...directAssoc, ...siblings]) {
+      if (eq.id !== equipamentoId) candidateMap.set(eq.id, eq.nome);
+    }
+
+    const candidateIds = [...candidateMap.keys()];
+
+    // Step 3: check for overlapping bookings among all candidates
     // Overlap condition: booking.inicio < fim AND booking.fim > inicio
     const agendamentosConflito = await prisma.agendamento.findMany({
       where: {
-        equipamentoId: { in: associadosIds },
+        equipamentoId: { in: candidateIds },
         inicio: { lt: fim },
         fim: { gt: inicio },
       },
@@ -81,17 +105,17 @@ export async function GET(request: NextRequest) {
     });
 
     const conflitos = agendamentosConflito.map((ag) => {
-      const agendadoPor = ag.usuario?.name || ag.usuario?.email || 'Unknown';
-      const para = ag.paraUsuarioInterno
-        ? ` (para ${ag.paraUsuarioInterno.name || ag.paraUsuarioInterno.email})`
+      const bookedBy = ag.usuario?.name || ag.usuario?.email || 'Unknown';
+      const forWhom = ag.paraUsuarioInterno
+        ? ` (for ${ag.paraUsuarioInterno.name || ag.paraUsuarioInterno.email})`
         : ag.paraUsuarioExterno
-        ? ` (para ${ag.paraUsuarioExterno})`
+        ? ` (for ${ag.paraUsuarioExterno})`
         : '';
 
       return {
         equipamentoId: ag.equipamentoId,
         equipamentoNome: ag.equipamento?.nome || '',
-        agendadoPor: agendadoPor + para,
+        agendadoPor: bookedBy + forWhom,
         inicio: ag.inicio.toISOString(),
         fim: ag.fim.toISOString(),
       };

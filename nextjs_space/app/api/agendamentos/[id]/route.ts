@@ -48,28 +48,14 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    const isAdmin = user?.category === 'Admin';
-
     const booking = await prisma.agendamento.findUnique({ where: { id } });
     if (!booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
-    // Can delete: admin, creator, or equipment manager
-    const canDelete =
-      isAdmin ||
-      booking.userId === session.user.id ||
-      !!(await prisma.autorizacaoEquipamento.findFirst({
-        where: {
-          equipamentoId: booking.equipamentoId,
-          userId: session.user.id,
-          tipo: 'RESPONSAVEL',
-        },
-      }));
-
-    if (!canDelete) {
-      return NextResponse.json({ error: 'No permission to delete' }, { status: 403 });
+    // Only the creator of the booking can delete it
+    if (booking.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Only the booking creator can delete it' }, { status: 403 });
     }
 
     await prisma.agendamento.delete({ where: { id } });
