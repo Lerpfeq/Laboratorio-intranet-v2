@@ -71,18 +71,24 @@ function detectTransport(): { transport: Transport; details: string } {
   return { transport, details };
 }
 
-/* ─────────── Send via SendGrid HTTP API ─────────── */
+/* ─────────── Send via SendGrid HTTP API (with optional CC) ─────────── */
 async function sendOneViaSendGrid(
   to: string,
   subject: string,
   html: string,
   fromEmail: string,
   fromName: string,
+  cc?: string[],
 ): Promise<{ ok: boolean; id?: string; error?: string; ms: number }> {
   const startMs = Date.now();
   const apiKey = process.env.SENDGRID_API_KEY!.trim();
 
-  console.log(`[Email/SendGrid][${NOW()}] Sending to: ${to}`);
+  console.log(`[Email/SendGrid][${NOW()}] Sending to: ${to}${cc?.length ? ` | CC: ${cc.join(', ')}` : ''}`);
+
+  const personalization: any = { to: [{ email: to }] };
+  if (cc && cc.length > 0) {
+    personalization.cc = cc.map(e => ({ email: e }));
+  }
 
   try {
     const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -92,7 +98,7 @@ async function sendOneViaSendGrid(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email: to }] }],
+        personalizations: [personalization],
         from: { email: fromEmail, name: fromName },
         subject,
         content: [{ type: 'text/html', value: html }],
@@ -103,13 +109,13 @@ async function sendOneViaSendGrid(
 
     if (res.status === 202) {
       const msgId = res.headers.get('x-message-id') || undefined;
-      console.log(`[Email/SendGrid][${NOW()}] ✅ Sent to ${to} in ${ms}ms — id: ${msgId}`);
+      console.log(`[Email/SendGrid][${NOW()}] ✅ Sent in ${ms}ms — id: ${msgId}`);
       return { ok: true, id: msgId, ms };
     }
 
     let errBody = '';
     try { errBody = await res.text(); } catch {}
-    console.error(`[Email/SendGrid][${NOW()}] ❌ HTTP ${res.status} for ${to}: ${errBody}`);
+    console.error(`[Email/SendGrid][${NOW()}] ❌ HTTP ${res.status}: ${errBody}`);
     return { ok: false, error: `HTTP ${res.status}: ${errBody.slice(0, 200)}`, ms };
 
   } catch (err: any) {
@@ -332,18 +338,20 @@ export async function sendAgendamentoEmails(
     return;
   }
 
-  // ── Collect recipients ──
-  const recipients = new Set<string>();
-  if (data.criadoPorEmail)   { recipients.add(data.criadoPorEmail); }
-  if (data.paraQuemEmail)    { recipients.add(data.paraQuemEmail); }
-  for (const email of responsavelEmails) { if (email) recipients.add(email); }
-  if (isExterno && data.emailOrientador) { recipients.add(data.emailOrientador); }
+  // ── Determine TO and CC ──
+  // TO  : the person who was booked (internal email or external email)
+  // CC  : advisor email (only for external users)
+  const toEmail = data.paraQuemEmail?.trim();
+  const ccEmails: string[] = [];
+  if (isExterno && data.emailOrientador?.trim()) {
+    ccEmails.push(data.emailOrientador.trim());
+  }
 
-  const recipientList = Array.from(recipients);
-  console.log(`║ Total unique recipients: ${recipientList.length} [${recipientList.join(', ')}]`);
+  console.log(`║ TO  : ${toEmail || '(none)'}`);
+  console.log(`║ CC  : ${ccEmails.length > 0 ? ccEmails.join(', ') : '(none)'}`);
 
-  if (recipientList.length === 0) {
-    console.log('║ ⚠️ No recipients — skipping');
+  if (!toEmail) {
+    console.log('║ ⚠️ No TO recipient — skipping email');
     console.log('╚══════════════════════════════════════════════════════════════╝');
     return;
   }
@@ -365,39 +373,43 @@ export async function sendAgendamentoEmails(
 
   const html    = formatEmailHtml(data, googleCalLink);
   const subject = `📅 LERP — Scheduling Confirmed: ${data.equipamentoNome} — ${data.inicio}`;
-  const FROM_EMAIL = process.env.EMAIL_USER || 'lerpfeq@gmail.com';
-  const FROM_NAME  = 'LERP — FEQ/UNICAMP';
+  const FROM_EMAIL  = process.env.EMAIL_USER || 'lerpfeq@gmail.com';
+  const FROM_NAME   = 'LERP — FEQ/UNICAMP';
   const RESEND_FROM = process.env.RESEND_FROM_EMAIL || 'LERP <onboarding@resend.dev>';
   const SMTP_FROM   = `"${FROM_NAME}" <${FROM_EMAIL}>`;
 
   const results: { email: string; ok: boolean; error?: string; id?: string; ms: number }[] = [];
   const batchStart = Date.now();
 
-  for (const email of recipientList) {
-    console.log(`║ ═══ Sending to: ${email} ═══`);
+  console.log(`║ ═══ Sending to: ${toEmail}${ccEmails.length ? ` (CC: ${ccEmails.join(', ')})` : ''} ═══`);
 
-    if (transport === 'sendgrid') {
-      const r = await sendOneViaSendGrid(email, subject, html, FROM_EMAIL, FROM_NAME);
-      results.push({ email, ok: r.ok, error: r.error, id: r.id, ms: r.ms });
+  if (transport === 'sendgrid') {
+    const r = await sendOneViaSendGrid(toEmail, subject, html, FROM_EMAIL, FROM_NAME, ccEmails.length > 0 ? ccEmails : undefined);
+    results.push({ email: toEmail, ok: r.ok, error: r.error, id: r.id, ms: r.ms });
 
-    } else if (transport === 'resend') {
-      const resendResult = getResendClient();
-      if (!resendResult) {
-        results.push({ email, ok: false, error: 'Resend client unavailable', ms: 0 });
-        continue;
-      }
-      const r = await sendOneViaResend(resendResult.client, email, subject, html, RESEND_FROM);
-      results.push({ email, ok: r.ok, error: r.error, id: r.id, ms: r.ms });
-
+  } else if (transport === 'resend') {
+    // Resend: send TO first, then CC separately (Resend free doesn't support CC natively)
+    const resendResult = getResendClient();
+    if (!resendResult) {
+      results.push({ email: toEmail, ok: false, error: 'Resend client unavailable', ms: 0 });
     } else {
-      // SMTP — will fail on Render (ports blocked), but kept as last resort
-      const transporter = createSmtpTransporter();
-      if (!transporter) {
-        results.push({ email, ok: false, error: 'No SMTP credentials', ms: 0 });
-        continue;
+      const r = await sendOneViaResend(resendResult.client, toEmail, subject, html, RESEND_FROM);
+      results.push({ email: toEmail, ok: r.ok, error: r.error, id: r.id, ms: r.ms });
+      // Send CC separately
+      for (const ccEmail of ccEmails) {
+        const rc = await sendOneViaResend(resendResult.client, ccEmail, `[CC] ${subject}`, html, RESEND_FROM);
+        results.push({ email: ccEmail, ok: rc.ok, error: rc.error, id: rc.id, ms: rc.ms });
       }
-      const r = await sendOneViaSmtp(transporter, email, subject, html, SMTP_FROM);
-      results.push({ email, ok: r.ok, error: r.error, id: r.messageId, ms: r.ms });
+    }
+
+  } else {
+    // SMTP — will fail on Render (ports blocked)
+    const transporter = createSmtpTransporter();
+    if (!transporter) {
+      results.push({ email: toEmail, ok: false, error: 'No SMTP credentials', ms: 0 });
+    } else {
+      const r = await sendOneViaSmtp(transporter, toEmail, subject, html, SMTP_FROM);
+      results.push({ email: toEmail, ok: r.ok, error: r.error, id: r.messageId, ms: r.ms });
       transporter.close();
     }
   }
