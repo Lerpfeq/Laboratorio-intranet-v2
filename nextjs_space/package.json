@@ -147,5 +147,7 @@
     "last 2 versions",
     "not dead"
   ],
-  "packageManager": "npm@10.9.2"
+  "resolutions": {
+    "source-map-js": "1.2.1"
+  }
 }
