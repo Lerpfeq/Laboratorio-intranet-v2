@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
     }
 
     const formatDate = (d: Date) =>
-      d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
 
     const emailPayload = {
       equipamentoNome: equipamento.nome,

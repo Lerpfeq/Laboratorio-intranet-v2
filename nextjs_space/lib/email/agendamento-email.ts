@@ -297,7 +297,7 @@ function formatEmailHtml(data: BookingEmailData, googleCalLink: string | null): 
     <div style="background:#f9f9f9;padding:20px;text-align:center;border-top:1px solid #eee;">
       <p style="margin:0;color:#666;font-size:14px;font-weight:bold;">LERP — FEQ/UNICAMP</p>
       <p style="margin:4px 0 0 0;color:#999;font-size:12px;">
-        Laboratório de Engenharia de Reações Poliméricas — Prof. Dr. Roniérik Pioli Vieira
+        Laboratory of Engineering of Polymeric Reactions — Prof. Dr. Roniérik Pioli Vieira
       </p>
       <p style="margin:8px 0 0 0;color:#bbb;font-size:11px;">
         This is an automated message. Please do not reply to this email.
