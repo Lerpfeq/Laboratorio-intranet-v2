@@ -42,9 +42,9 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { email: true, name: true, isAdmin: true },
+      select: { email: true, name: true, category: true },
     });
-    log("User", `${user?.name} <${user?.email}> isAdmin=${user?.isAdmin}`);
+    log("User", `${user?.name} <${user?.email}> category=${user?.category}`);
 
     // ─── Env var inspection ───
     const sgKey  = process.env.SENDGRID_API_KEY;
@@ -85,7 +85,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       transport,
-      user: { email: user?.email, name: user?.name, isAdmin: user?.isAdmin },
+      user: { email: user?.email, name: user?.name, category: user?.category },
       envVars: {
         SENDGRID_API_KEY: mask(sgKey),
         RESEND_API_KEY:   mask(rsKey),
@@ -123,10 +123,10 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { email: true, name: true, isAdmin: true },
+      select: { email: true, name: true, category: true },
     });
 
-    if (!user?.isAdmin) {
+    if (!user?.category || !['Admin', 'IC'].includes(user.category)) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
 
