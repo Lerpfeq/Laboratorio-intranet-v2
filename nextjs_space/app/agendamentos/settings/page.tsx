@@ -432,7 +432,10 @@ export default function SettingsPage() {
               <h3 style={{ marginBottom: '1rem' }}>👥 Authorizations - {showAuthModal.nome}</h3>
               <p style={{ color: '#666', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
                 <strong>Manager:</strong> Can manage the equipment and its authorizations.<br />
-                <strong>Trained:</strong> Can book the equipment.
+                <strong>Trained:</strong> Can book the equipment.<br />
+                <em style={{ color: '#888', fontSize: '0.85rem' }}>
+                  ℹ️ Equipment without managers is unrestricted — anyone can book it for themselves or others.
+                </em>
               </p>
 
               {/* Add authorization */}

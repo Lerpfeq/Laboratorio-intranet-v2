@@ -261,14 +261,19 @@ export default function AgendamentosPage() {
   const isAdmin = user?.category === 'Admin';
 
   // Whether the current user can book on behalf of others (internal/external)
-  // for a given equipment: admins always, and managers (responsáveis) of it.
+  // for a given equipment: admins always, managers (responsáveis) of it, and
+  // anyone if the equipment has NO managers (unrestricted equipment).
   const canBookForOthersFor = (equipId: string): boolean => {
     if (isAdmin) return true;
     const eq = equipamentos.find((e) => e.id === equipId);
     if (!eq) return false;
-    return (eq.autorizacoes || []).some(
-      (a: any) => a.userId === user?.id && a.tipo === 'RESPONSAVEL'
+    const responsaveis = (eq.autorizacoes || []).filter(
+      (a: any) => a.tipo === 'RESPONSAVEL'
     );
+    // If equipment has no managers, it's unrestricted — everyone can book for others
+    if (responsaveis.length === 0) return true;
+    // Otherwise, only managers can book for others
+    return responsaveis.some((a: any) => a.userId === user?.id);
   };
   const canBookForOthers = canBookForOthersFor(formData.equipamentoId);
 

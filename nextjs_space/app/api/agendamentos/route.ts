@@ -103,11 +103,14 @@ export async function POST(request: NextRequest) {
     // Verificar authorization (Admin pode sempre, outros precisam authorization)
     const isAdmin = user.category === 'Admin';
     let isResponsavel = false;
+    const hasResponsaveis = equipamento.autorizacoes.length > 0;
+    
     if (!isAdmin) {
       const autorizacao = await prisma.autorizacaoEquipamento.findFirst({
         where: { equipamentoId, userId: session.user.id },
       });
-      if (!autorizacao) {
+      // Equipment without managers is unrestricted — everyone can book it
+      if (!autorizacao && hasResponsaveis) {
         return NextResponse.json(
           { error: 'You are not authorized to book this equipment' },
           { status: 403 }
@@ -120,9 +123,9 @@ export async function POST(request: NextRequest) {
         .then((a) => !!a);
     }
 
-    // Only admins and equipment managers (responsáveis) can book on behalf of
-    // other people (internal or external). Regular users can only book for themselves.
-    const canBookForOthers = isAdmin || isResponsavel;
+    // Only admins, equipment managers (responsáveis), or anyone (if equipment has no managers)
+    // can book on behalf of other people (internal or external).
+    const canBookForOthers = isAdmin || isResponsavel || !hasResponsaveis;
     if (!canBookForOthers && paraQuem && paraQuem !== 'eu') {
       return NextResponse.json(
         { error: 'You can only book for yourself for this equipment' },
