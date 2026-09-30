@@ -277,6 +277,11 @@ export default function AgendamentosPage() {
   };
   const canBookForOthers = canBookForOthersFor(formData.equipamentoId);
 
+  // Whether this user manages (is responsável for) at least one equipment
+  const isManagerOfAny = equipamentos.some((eq) =>
+    (eq.autorizacoes || []).some((a: any) => a.userId === user?.id && a.tipo === 'RESPONSAVEL')
+  );
+
   const formatDateTime = (d: string) => {
     const date = new Date(d);
     return date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
@@ -313,7 +318,7 @@ export default function AgendamentosPage() {
             <Link href="/agendamentos" style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '4px' }}>Calendar</Link>
             <Link href="/agendamentos/equipe">Team</Link>
             <Link href="/residuos">Waste</Link>
-            {isAdmin && <Link href="/agendamentos/settings">Settings</Link>}
+            {(isAdmin || isManagerOfAny) && <Link href="/agendamentos/settings">Settings</Link>}
             {isAdmin && <Link href="/admin">Admin</Link>}
           </nav>
           <div className="user-menu">
