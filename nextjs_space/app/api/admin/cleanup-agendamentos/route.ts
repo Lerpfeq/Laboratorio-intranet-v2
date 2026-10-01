@@ -1,64 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { cleanupPastBookings } from '@/lib/cleanup';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Cleanup route — deletes all past bookings (where `fim` < now).
- *
- * Protected by the CLEANUP_SECRET env var. The secret can be provided via:
- *   - Header:  X-Cleanup-Secret: <secret>
- *   - Query:   ?secret=<secret>
- *
- * Accepts both GET (e.g. for cron/uptime pings) and POST.
- * Returns: { deleted: number, timestamp: string }
+ * Admin-only endpoint to manually trigger a past-booking cleanup.
+ * The daily cleanup is handled automatically by the built-in cron job
+ * registered in instrumentation.ts (runs at 00:05 every day).
  */
 async function handleCleanup(request: NextRequest) {
-  const expected = process.env.CLEANUP_SECRET;
-
-  if (!expected) {
-    console.error('[cleanup-agendamentos] CLEANUP_SECRET is not configured');
-    return NextResponse.json(
-      { error: 'Cleanup is not configured on the server' },
-      { status: 500 }
-    );
-  }
-
-  const { searchParams } = new URL(request.url);
-  const provided =
-    request.headers.get('x-cleanup-secret') || searchParams.get('secret') || '';
-
-  if (provided !== expected) {
-    console.warn('[cleanup-agendamentos] Rejected request with invalid secret');
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (user?.category !== 'Admin') {
+    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+  }
 
-  const now = new Date();
-  const result = await prisma.agendamento.deleteMany({
-    where: { fim: { lt: now } },
-  });
-
-  const timestamp = now.toISOString();
-  console.log(
-    `[cleanup-agendamentos] Deleted ${result.count} past booking(s) at ${timestamp}`
-  );
-
-  return NextResponse.json({ deleted: result.count, timestamp });
+  const result = await cleanupPastBookings();
+  return NextResponse.json(result);
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    return await handleCleanup(request);
-  } catch (error: any) {
+  try { return await handleCleanup(request); }
+  catch (error: any) {
     console.error('[cleanup-agendamentos] Error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    return await handleCleanup(request);
-  } catch (error: any) {
+  try { return await handleCleanup(request); }
+  catch (error: any) {
     console.error('[cleanup-agendamentos] Error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
