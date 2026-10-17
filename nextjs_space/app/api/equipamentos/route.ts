@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { assocSelect, mesclarAssociados } from '@/lib/equipamento-associados';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,11 +31,11 @@ export async function GET(request: NextRequest) {
               user: { select: { id: true, name: true, email: true } },
             },
           },
-          equipamentosAssociados: { select: { id: true, nome: true } },
+          ...assocSelect,
         },
         orderBy: { nome: 'asc' },
       });
-      return NextResponse.json(equipments);
+      return NextResponse.json(equipments.map(mesclarAssociados));
     }
 
     if (isAdmin) {
@@ -45,12 +46,12 @@ export async function GET(request: NextRequest) {
               user: { select: { id: true, name: true, email: true } },
             },
           },
-          equipamentosAssociados: { select: { id: true, nome: true } },
+          ...assocSelect,
           _count: { select: { agendamentos: true } },
         },
         orderBy: { nome: 'asc' },
       });
-      return NextResponse.json(equipments);
+      return NextResponse.json(equipments.map(mesclarAssociados));
     } else {
       // Regular user - sees equipment they're authorized for OR equipment with no
       // authorizations at all (unrestricted equipment, open to everyone).
@@ -67,11 +68,11 @@ export async function GET(request: NextRequest) {
               user: { select: { id: true, name: true, email: true } },
             },
           },
-          equipamentosAssociados: { select: { id: true, nome: true } },
+          ...assocSelect,
         },
         orderBy: { nome: 'asc' },
       });
-      return NextResponse.json(equipments);
+      return NextResponse.json(equipments.map(mesclarAssociados));
     }
   } catch (error: any) {
     console.error('Error fetching equipments:', error);

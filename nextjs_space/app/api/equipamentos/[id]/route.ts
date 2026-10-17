@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { assocSelect, mesclarAssociados } from '@/lib/equipamento-associados';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ export async function GET(
             user: { select: { id: true, name: true, email: true } },
           },
         },
+        ...assocSelect,
       },
     });
 
@@ -32,7 +34,7 @@ export async function GET(
       return NextResponse.json({ error: 'Equipment not found' }, { status: 404 });
     }
 
-    return NextResponse.json(equipment);
+    return NextResponse.json(mesclarAssociados(equipment));
   } catch (error: any) {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
@@ -72,20 +74,23 @@ export async function PUT(
 
     // Only admins can manage equipment associations
     if (isAdmin && Array.isArray(equipamentosAssociados)) {
-      data.equipamentosAssociados = {
-        set: equipamentosAssociados.map((assocId: string) => ({ id: assocId })),
-      };
+      // Associações simétricas: aplicamos a mesma lista nos dois lados da relação.
+      // - equipamentosAssociados: vínculos A -> B
+      // - associadoPor: vínculos B -> A (conecta A em B ao marcar; desconecta ao desmarcar)
+      const ids = Array.from(
+        new Set<string>(equipamentosAssociados.filter((assocId: string) => assocId && assocId !== id))
+      ).map((assocId) => ({ id: assocId }));
+      data.equipamentosAssociados = { set: ids };
+      data.associadoPor = { set: ids };
     }
 
     const equipment = await prisma.equipamento.update({
       where: { id },
       data,
-      include: {
-        equipamentosAssociados: { select: { id: true, nome: true } },
-      },
+      include: assocSelect,
     });
 
-    return NextResponse.json(equipment);
+    return NextResponse.json(mesclarAssociados(equipment));
   } catch (error: any) {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
