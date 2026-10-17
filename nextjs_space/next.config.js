@@ -8,6 +8,7 @@ const nextConfig = {
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../'),
     instrumentationHook: true,
+    serverComponentsExternalPackages: ['node-cron'],
   },
   eslint: {
     ignoreDuringBuilds: true,
